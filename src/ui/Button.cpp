@@ -1,11 +1,15 @@
 #include "Button.h"
 #include "Font.h"
+#include "UIUtils.h"
 #include <GLFW/glfw3.h>
 
 Button::Button(const std::string& text, float x, float y, float width, float height, Font* font, std::function<void()> onClick)
     : text(text), x(x), y(y), width(width), height(height), font(font), onClick(onClick) {}
 
 void Button::draw(Shader& shader) {
+    glm::vec4 bgColor = isHovered ? glm::vec4(0.4f, 0.4f, 0.4f, 1.0f) : glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
+    UIUtils::drawRect(shader, x, y, width, height, bgColor);
+    
     glm::vec4 color = isHovered ? glm::vec4(1.0f, 1.0f, 0.0f, 1.0f) : glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     
     float textWidth = font->getTextWidth(text);

@@ -42,8 +42,8 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     }
 }
 
-const int INITIAL_WINDOW_WIDTH = 500;
-const int INITIAL_WINDOW_HEIGHT = 500;
+const int INITIAL_WINDOW_WIDTH = 1280;
+const int INITIAL_WINDOW_HEIGHT = 720;
 
 Shader loadShader(const std::string &vertexPath, const std::string &fragmentPath, bool withTexture = true, bool withLight = true);
 
@@ -166,7 +166,7 @@ int main() {
             glfwGetWindowSize(window, &winW, &winH);
             uiShader.uiProjection = glm::ortho(0.0f, (float)winW, (float)winH, 0.0f, -1.0f, 1.0f);
             
-            menuManager.draw(uiShader);
+            menuManager.draw(uiShader, winW, winH);
             
             encoder->endEncoding();
             pass->release();

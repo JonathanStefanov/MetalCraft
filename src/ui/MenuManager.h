@@ -13,7 +13,7 @@ public:
     ~MenuManager();
 
     void init(int screenWidth, int screenHeight, GLFWwindow* window);
-    void draw(Shader& shader);
+    void draw(Shader& shader, int screenWidth, int screenHeight);
     void handleMouseMoved(double x, double y);
     void handleMouseClicked(double x, double y, int button, int action);
 

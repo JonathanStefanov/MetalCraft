@@ -196,6 +196,7 @@ struct UIVertexOut {
 struct UIUniforms {
     float4x4 projection;
     float4 color;
+    int type;
 };
 
 vertex UIVertexOut uiVertex(UIVertexIn in [[stage_in]],
@@ -212,6 +213,13 @@ fragment float4 uiFragment(UIVertexOut in [[stage_in]],
                            texture2d<float> tex [[texture(0)]],
                            sampler texSampler [[sampler(0)]])
 {
-    float alpha = tex.sample(texSampler, in.v_t).r;
-    return float4(uniforms.color.rgb, uniforms.color.a * alpha);
+    if (uniforms.type == 0) {
+        return uniforms.color;
+    } else if (uniforms.type == 1) {
+        float alpha = tex.sample(texSampler, in.v_t).r;
+        return float4(uniforms.color.rgb, uniforms.color.a * alpha);
+    } else {
+        float4 tColor = tex.sample(texSampler, in.v_t);
+        return tColor * uniforms.color;
+    }
 }

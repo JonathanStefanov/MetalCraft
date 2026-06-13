@@ -91,10 +91,13 @@ void Font::drawText(Shader& shader, const std::string& text, float startX, float
     struct UIUniforms {
         simd::float4x4 projection;
         simd::float4 color;
+        int type;
+        int padding[3];
     } uniforms;
 
     memcpy(&uniforms.projection, glm::value_ptr(shader.uiProjection), sizeof(simd::float4x4));
     uniforms.color = simd_make_float4(color.r, color.g, color.b, color.a);
+    uniforms.type = 1; // Text
 
     encoder->setVertexBytes(&uniforms, sizeof(UIUniforms), 1);
     encoder->setFragmentBytes(&uniforms, sizeof(UIUniforms), 1);
