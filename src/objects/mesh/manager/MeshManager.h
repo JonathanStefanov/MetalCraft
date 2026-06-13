@@ -7,7 +7,6 @@
 
 #include <string>
 #include <map>
-#include "glad/glad.h"
 #include "../Mesh.h"
 
 

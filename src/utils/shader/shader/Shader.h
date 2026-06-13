@@ -1,37 +1,40 @@
 #ifndef SHADER_H
 #define SHADER_H
 
-#include <glad/glad.h>
-
 #include <string>
-#include <fstream>
-#include <sstream>
-#include <iostream>
 #include "glm/vec3.hpp"
 #include "glm/fwd.hpp"
+#include "../../metal/ShaderTypes.h"
+
+namespace MTL {
+    class RenderPipelineState;
+    class DepthStencilState;
+    class RenderCommandEncoder;
+}
 
 class Shader
 {
 public:
-    GLuint ID;
+    MTL::RenderPipelineState* pipelineState;
+    MTL::DepthStencilState* depthStencilState;
+    MTL::RenderCommandEncoder* encoder = nullptr;
+    Uniforms uniforms;
+    LightUniforms lightUniforms;
 
-    Shader(std::string &vertexShaderPath, std::string &fragmentShaderPath, bool withTexture = true, bool withLight = true);
+    Shader(const std::string& vertexFunctionName, const std::string& fragmentFunctionName, bool withTexture = true, bool withLight = true);
+    ~Shader();
 
-    void use() const;
-    void setInteger(const GLchar *name, GLint value) const;
-    void setFloat(const GLchar* name, GLfloat value) const;
-    void setVector3f(const GLchar* name, GLfloat x, GLfloat y, GLfloat z) const;
-    void setVector3f(const GLchar* name, const glm::vec3& value) const;
-    void setMatrix4(const GLchar* name, const glm::mat4& matrix) const;
-    void set1i(const GLchar* name, GLint value) const;
-
-    bool withTexture, withLight;
-
+    void use() const; // Unused in Metal, pipeline state is set during render encoding
+    
+    // Instead of set* methods sending to GPU, we update the local structs
+    void setInteger(const char *name, int value);
+    void setFloat(const char* name, float value);
+    void setVector3f(const char* name, float x, float y, float z);
+    void setVector3f(const char* name, const glm::vec3& value);
+    void setMatrix4(const char* name, const glm::mat4& matrix);
+    void set1i(const char* name, int value);
     void setBool(const char *string, bool b);
 
-private:
-    static GLuint compileShader(const std::string& shaderCode, GLenum shaderType);
-
-    static GLuint compileProgram(GLuint vertexShader, GLuint fragmentShader);
+    bool withTexture, withLight;
 };
 #endif

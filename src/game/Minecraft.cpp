@@ -34,7 +34,7 @@ Minecraft::Minecraft(int width, int height, int depth, int nbrTrees, int nbCircl
             size = 0.3;
         }
         auto* sheep = new GameObject(MeshManager::getMesh(MeshType::SHEEP));
-        sheep->setTextureID(TextureManager::getTextureID(TextureType::WHITE_SHEEP));
+        sheep->setTexture(TextureManager::getTextureID(TextureType::WHITE_SHEEP));
         sheep->transform.setPosition(10, 1, 10);
         sheep->transform.setScale(size, size, size);
         sheep->collider = Collider{2.0f, 2.0f, 0.5f};
@@ -49,7 +49,7 @@ Minecraft::Minecraft(int width, int height, int depth, int nbrTrees, int nbCircl
             size = 1.5;
         }
         auto* sheep = new GameObject(MeshManager::getMesh(MeshType::VILLAGER));
-        sheep->setTextureID(TextureManager::getTextureID(TextureType::BROWN_VILLAGER));
+        sheep->setTexture(TextureManager::getTextureID(TextureType::BROWN_VILLAGER));
         sheep->transform.setPosition(10, 1, 10);
         sheep->transform.setScale(size, size, size);
         sheep->collider = Collider{2.0f, 2.0f, 0.5f};

@@ -19,7 +19,7 @@ void PhysicsManager::update() {
 
 
         if (physicsData.velocity != 0 && blockAt != nullptr &&
-            blockAt->textureID != TextureManager::getTextureID(TextureType::WATER)) {
+            blockAt->texture != TextureManager::getTextureID(TextureType::WATER)) {
 
 
             data->getTransform()->setPosition(data->getTransform()->position.x, blockAt->transform.position.y + 1,
@@ -27,7 +27,7 @@ void PhysicsManager::update() {
 
             physicsData.velocity = 0;
             physicsData.acceleration = 0;
-        } else if (blockAt == nullptr || blockAt->textureID == TextureManager::getTextureID(TextureType::WATER)) {
+        } else if (blockAt == nullptr || blockAt->texture == TextureManager::getTextureID(TextureType::WATER)) {
                 physicsData.acceleration = -0.02;
         } else if (physicsData.velocity != 0){
             physicsData.acceleration = -0.02;

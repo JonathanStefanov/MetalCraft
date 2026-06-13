@@ -1,10 +1,10 @@
-#include<iostream>
-
-//include glad before GLFW to avoid header conflict or define "#define GLFW_INCLUDE_NONE"
-#include <glad/glad.h>
+#include <iostream>
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include "utils/metal/MetalContext.h"
+#include <Metal/Metal.hpp>
+#include <QuartzCore/QuartzCore.hpp>
 
-//Don't forget the glm header
 #include <glm/glm.hpp>
 #include "stb_image.h"
 
@@ -22,214 +22,63 @@
 #include "objects/mesh/manager/MeshManager.h"
 #include "cubemap/CubeMap.h"
 
-#define SHADER_PATH "shaders/"
-
 const int INITIAL_WINDOW_WIDTH = 500;
 const int INITIAL_WINDOW_HEIGHT = 500;
 
-
-Shader loadShader(const std::string &vertexPath, const std::string &fragmentPath, bool withTexture = true,
-                  bool withLight = true);
+Shader loadShader(const std::string &vertexPath, const std::string &fragmentPath, bool withTexture = true, bool withLight = true);
 
 void setupMeshs();
-
 void setupTextures();
-
 CubeMap *loadCubeMap();
 
-void setupShadowShader(int &shadowTextureWidth, int &shadowTextureHeight, GLuint &m_ShadowMapDepthStencilTextureId,
-                       GLuint &m_ShadowMapFBOId);
+void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, MTL::Texture* shadowMapTexture, MTL::CommandBuffer* cmdBuf, const glm::mat4 &lightV, const glm::mat4 &lightP);
 
-void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, int shadowTextureWidth, int shadowTextureHeight,
-                     GLuint m_ShadowMapFBOId, const glm::mat4 &lightV, const glm::mat4 &lightP);
-
-void renderMinecraft(GLFWwindow *window, Minecraft *minecraft, Shader &shader, const CubeMap *cubeMap,
-                     GLuint m_ShadowMapDepthStencilTextureId, const glm::mat4 &lightSpaceMatrix, int &width,
-                     int &height);
-
-void renderSkyBox(const Minecraft *minecraft, Shader &cubeMapShader, const CubeMap *cubeMap);
-
-#ifndef NDEBUG
-
-void APIENTRY glDebugOutput(GLenum source,
-                            GLenum type,
-                            unsigned int id,
-                            GLenum severity,
-                            GLsizei length,
-                            const char *message,
-                            const void *userParam) {
-    // ignore non-significant error/warning codes
-    if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
-
-    std::cout << "---------------" << std::endl;
-    std::cout << "Debug message (" << id << "): " << message << std::endl;
-
-    switch (source) {
-        case GL_DEBUG_SOURCE_API:
-            std::cout << "Source: API";
-            break;
-        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
-            std::cout << "Source: Window System";
-            break;
-        case GL_DEBUG_SOURCE_SHADER_COMPILER:
-            std::cout << "Source: Shader Compiler";
-            break;
-        case GL_DEBUG_SOURCE_THIRD_PARTY:
-            std::cout << "Source: Third Party";
-            break;
-        case GL_DEBUG_SOURCE_APPLICATION:
-            std::cout << "Source: Application";
-            break;
-        case GL_DEBUG_SOURCE_OTHER:
-            std::cout << "Source: Other";
-            break;
-        default:
-            std::cout << "Unknown error";
-            break;
-    }
-    std::cout << std::endl;
-
-    switch (type) {
-        case GL_DEBUG_TYPE_ERROR:
-            std::cout << "Type: Error";
-            break;
-        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-            std::cout << "Type: Deprecated Behaviour";
-            break;
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
-            std::cout << "Type: Undefined Behaviour";
-            break;
-        case GL_DEBUG_TYPE_PORTABILITY:
-            std::cout << "Type: Portability";
-            break;
-        case GL_DEBUG_TYPE_PERFORMANCE:
-            std::cout << "Type: Performance";
-            break;
-        case GL_DEBUG_TYPE_MARKER:
-            std::cout << "Type: Marker";
-            break;
-        case GL_DEBUG_TYPE_PUSH_GROUP:
-            std::cout << "Type: Push Group";
-            break;
-        case GL_DEBUG_TYPE_POP_GROUP:
-            std::cout << "Type: Pop Group";
-            break;
-        case GL_DEBUG_TYPE_OTHER:
-            std::cout << "Type: Other";
-            break;
-        default:
-            std::cout << "Unknown error";
-            break;
-    }
-    std::cout << std::endl;
-
-    switch (severity) {
-        case GL_DEBUG_SEVERITY_HIGH:
-            std::cout << "Severity: high";
-            break;
-        case GL_DEBUG_SEVERITY_MEDIUM:
-            std::cout << "Severity: medium";
-            break;
-        case GL_DEBUG_SEVERITY_LOW:
-            std::cout << "Severity: low";
-            break;
-        case GL_DEBUG_SEVERITY_NOTIFICATION:
-            std::cout << "Severity: notification";
-            break;
-        default:
-            std::cout << "Unknown severity";
-            break;
-    }
-    std::cout << std::endl;
-    std::cout << std::endl;
-}
-
-#endif
+void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height);
 
 
 int main() {
     if (!glfwInit()) {
         throw std::runtime_error("Failed to initialise GLFW \n");
     }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // Don't create an OpenGL context
 
-#ifndef NDEBUG
-    //create a debug context to help with Debugging
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
-#endif
-
-    //Create the window
-    GLFWwindow *window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Gaspard is cool", nullptr,
-                                          nullptr);
+    GLFWwindow *window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Gaspard is cool", nullptr, nullptr);
 
     if (window == nullptr) {
         glfwTerminate();
         throw std::runtime_error("Failed to create GLFW window\n");
     }
 
-    glfwMakeContextCurrent(window);
-
-    //load openGL function
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-        throw std::runtime_error("Failed to initialize GLAD");
-    }
-
-#ifndef NDEBUG
-    int flags;
-    glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
-    if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
-        glEnable(GL_DEBUG_OUTPUT);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        glDebugMessageCallback(glDebugOutput, nullptr);
-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
-    }
-#endif
-
+    MetalContext::init(window);
 
     setupMeshs();
     setupTextures();
 
     auto *minecraft = new Minecraft(100, 100, 1, 300, 2, glm::vec3(15, 1, 15), window);
 
-
-    Shader shadowShader = loadShader("shadow.vert.glsl", "shadow.frag.glsl", false, false);
-    Shader shader = loadShader("vertex.glsl", "fragment.glsl");
-    Shader cubeMapShader = loadShader("cubemap.vert.glsl", "cubemap.frag.glsl");
+    Shader shadowShader = loadShader("shadowVertex", "shadowFragment", false, false);
+    Shader shader = loadShader("vertexMain", "fragmentMain");
+    Shader cubeMapShader = loadShader("cubemapVertex", "cubemapFragment");
 
     minecraft->linkShader(shader);
     minecraft->linkShader(shadowShader);
 
     CubeMap *cubeMap = loadCubeMap();
-    // load cubemap texture (the shader is not used here, but for similarity with the other objects)
     cubeMap->makeObject(shader);
 
-    // enable vsync
     glfwSwapInterval(1);
-
-    /**
-     * OPENGL STATIC CONFIGURATION (all settings that are not going to change during the program)
-     */
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_EQUAL);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
 
-    /**
-     * Shadow part
-     */
-    int shadowTextureWidth;
-    int shadowTextureHeight;
-    GLuint m_ShadowMapDepthStencilTextureId;
-    GLuint shadowMapFboId;
-
-    setupShadowShader(shadowTextureWidth, shadowTextureHeight, m_ShadowMapDepthStencilTextureId, shadowMapFboId);
-
-    // Needed since we don't touch the color buffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+    // Shadow Map Setup
+    int shadowTextureWidth = 4096;
+    int shadowTextureHeight = 4096;
+    MTL::TextureDescriptor* shadowDesc = MTL::TextureDescriptor::alloc()->init();
+    shadowDesc->setPixelFormat(MTL::PixelFormatDepth32Float);
+    shadowDesc->setWidth(shadowTextureWidth);
+    shadowDesc->setHeight(shadowTextureHeight);
+    shadowDesc->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+    MTL::Texture* shadowMapTexture = MetalContext::get()->getDevice()->newTexture(shadowDesc);
+    shadowDesc->release();
 
     const glm::mat4 &lightV = minecraft->light->getSpaceMatrix();
     const glm::mat4 &lightP = Light::getOrthoProjectionMatrix();
@@ -238,128 +87,119 @@ int main() {
     int width, height;
 
     while (!glfwWindowShouldClose(window)) {
-        // process opengl events
         minecraft->processEvents(window, shader);
 
-        glm::vec4 computed = lightSpaceMatrix*minecraft->player->getTransform()->getModel()*glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
         minecraft->updateManagers();
-
-
         glfwPollEvents();
-
-        // process input
         minecraft->processEvents(window, shader);
-
-        // update physics, pnjs, ...
         minecraft->updateManagers();
 
-        renderShadowMap(
-                minecraft,
-                shadowShader,
-                shadowTextureWidth,
-                shadowTextureHeight,
-                shadowMapFboId,
-                lightV,
-                lightP
-        );
+        glfwGetFramebufferSize(window, &width, &height);
+        MetalContext::get()->getMetalLayer()->setDrawableSize(CGSizeMake(width, height));
+        
+        CA::MetalDrawable* drawable = MetalContext::get()->getMetalLayer()->nextDrawable();
+        if (!drawable) {
+            continue;
+        }
 
-        renderMinecraft(
-                window,
-                minecraft,
-                shader,
-                cubeMap,
-                m_ShadowMapDepthStencilTextureId,
-                lightSpaceMatrix,
-                width,
-                height
-        );
+        MTL::CommandBuffer* cmdBuf = MetalContext::get()->getCommandQueue()->commandBuffer();
 
-        renderSkyBox(minecraft, cubeMapShader, cubeMap);
+        renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
 
-        glfwSwapBuffers(window);
+        renderMainPass(drawable, cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+
+        cmdBuf->presentDrawable(drawable);
+        cmdBuf->commit();
     }
 
-    //clean up ressource
+    if (shadowMapTexture) shadowMapTexture->release();
+    MetalContext::cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
 
     return 0;
 }
 
-void renderSkyBox(const Minecraft *minecraft, Shader &cubeMapShader, const CubeMap *cubeMap) {
-    cubeMapShader.use();
+void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height) {
+    MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
+    pass->colorAttachments()->object(0)->setTexture(drawable->texture());
+    pass->colorAttachments()->object(0)->setClearColor(MTL::ClearColor::Make(0.1, 0.1, 0.1, 1.0));
+    pass->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
+    pass->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+    
+    static MTL::Texture* depthTexture = nullptr;
+    if (!depthTexture || depthTexture->width() != width || depthTexture->height() != height) {
+        if (depthTexture) depthTexture->release();
+        MTL::TextureDescriptor* depthDesc = MTL::TextureDescriptor::alloc()->init();
+        depthDesc->setPixelFormat(MTL::PixelFormatDepth32Float);
+        depthDesc->setWidth(width);
+        depthDesc->setHeight(height);
+        depthDesc->setUsage(MTL::TextureUsageRenderTarget);
+        depthTexture = MetalContext::get()->getDevice()->newTexture(depthDesc);
+        depthDesc->release();
+    }
+    
+    pass->depthAttachment()->setTexture(depthTexture);
+    pass->depthAttachment()->setClearDepth(1.0);
+    pass->depthAttachment()->setLoadAction(MTL::LoadActionClear);
+    pass->depthAttachment()->setStoreAction(MTL::StoreActionDontCare);
+    
+    MTL::RenderCommandEncoder* encoder = cmdBuf->renderCommandEncoder(pass);
+    encoder->setCullMode(MTL::CullModeBack);
+    
+    // Draw Skybox
+    encoder->setRenderPipelineState(cubeMapShader.pipelineState);
+    encoder->setDepthStencilState(cubeMapShader.depthStencilState);
+    cubeMapShader.encoder = encoder;
     minecraft->configureMatrices(cubeMapShader);
     cubeMap->draw(cubeMapShader);
-}
-
-void renderMinecraft(GLFWwindow *window, Minecraft *minecraft, Shader &shader, const CubeMap *cubeMap,
-                     GLuint m_ShadowMapDepthStencilTextureId, const glm::mat4 &lightSpaceMatrix, int &width,
-                     int &height) {
-    glfwGetFramebufferSize(window, &width, &height);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    shader.use();
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glViewport(0, 0, width, height);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClearDepth(1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    glActiveTexture(GL_TEXTURE0 + 1);
-    glBindTexture(GL_TEXTURE_2D, m_ShadowMapDepthStencilTextureId);
+    
+    // Draw Minecraft
+    encoder->setRenderPipelineState(shader.pipelineState);
+    encoder->setDepthStencilState(shader.depthStencilState);
+    shader.encoder = encoder;
     shader.setMatrix4("lightSpaceMatrix", lightSpaceMatrix);
     minecraft->configureMatrices(shader);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap->textureID);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
     shader.setVector3f("u_view_pos", minecraft->camera->transform.position);
+    
+    encoder->setFragmentTexture(shadowMapTexture, 1);
+    encoder->setFragmentTexture(cubeMap->texture, 2); // Set cubemap for water reflection
     minecraft->render(shader);
+    
+    encoder->endEncoding();
+    pass->release();
 }
 
-void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, int shadowTextureWidth, int shadowTextureHeight,
-                     GLuint m_ShadowMapFBOId, const glm::mat4 &lightV, const glm::mat4 &lightP) {
-    glActiveTexture(GL_TEXTURE0);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_ShadowMapFBOId);
-    glViewport(0, 0, shadowTextureWidth, shadowTextureHeight);
-    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    shadowShader.use();
+void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, MTL::Texture* shadowMapTexture, MTL::CommandBuffer* cmdBuf, const glm::mat4 &lightV, const glm::mat4 &lightP) {
+    MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
+    pass->depthAttachment()->setTexture(shadowMapTexture);
+    pass->depthAttachment()->setClearDepth(1.0);
+    pass->depthAttachment()->setLoadAction(MTL::LoadActionClear);
+    pass->depthAttachment()->setStoreAction(MTL::StoreActionStore);
+    
+    MTL::RenderCommandEncoder* encoder = cmdBuf->renderCommandEncoder(pass);
+    encoder->setCullMode(MTL::CullModeBack);
+    encoder->setRenderPipelineState(shadowShader.pipelineState);
+    encoder->setDepthStencilState(shadowShader.depthStencilState);
+    
+    shadowShader.encoder = encoder;
     shadowShader.setMatrix4("P", lightP);
     shadowShader.setMatrix4("V", lightV);
+    
     minecraft->render(shadowShader);
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-}
-
-void setupShadowShader(int &shadowTextureWidth, int &shadowTextureHeight, GLuint &m_ShadowMapDepthStencilTextureId,
-                       GLuint &m_ShadowMapFBOId) {
-    shadowTextureWidth = 4096;
-    shadowTextureHeight = 4096;
-    glGenFramebuffers(1, &m_ShadowMapFBOId);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_ShadowMapFBOId);
-
-    glGenTextures(1, &m_ShadowMapDepthStencilTextureId);
-    glBindTexture(GL_TEXTURE_2D, m_ShadowMapDepthStencilTextureId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
-                 shadowTextureWidth, shadowTextureHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_ShadowMapDepthStencilTextureId, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
+    
+    encoder->endEncoding();
+    pass->release();
 }
 
 CubeMap *loadCubeMap() {
-    std::map<std::string, GLenum> facesToLoad = {
-            {"posx.jpg", GL_TEXTURE_CUBE_MAP_POSITIVE_X},
-            {"posy.jpg", GL_TEXTURE_CUBE_MAP_POSITIVE_Y},
-            {"posz.jpg", GL_TEXTURE_CUBE_MAP_POSITIVE_Z},
-            {"negx.jpg", GL_TEXTURE_CUBE_MAP_NEGATIVE_X},
-            {"negy.jpg", GL_TEXTURE_CUBE_MAP_NEGATIVE_Y},
-            {"negz.jpg", GL_TEXTURE_CUBE_MAP_NEGATIVE_Z},
+    std::map<std::string, int> facesToLoad = {
+            {"posx.jpg", 0},
+            {"negx.jpg", 1},
+            {"posy.jpg", 2},
+            {"negy.jpg", 3},
+            {"posz.jpg", 4},
+            {"negz.jpg", 5},
     };
 
     auto *dayCubeMap = new CubeMap("resources/skybox/day/skybox_", facesToLoad);
@@ -392,29 +232,6 @@ void setupMeshs() {
     MeshManager::linkMesh(RIGHTLEG_MESH, "resources/objects/steve_body/right_leg.obj");
 }
 
-Shader loadShader(const std::string &vertexPath, const std::string &fragmentPath, bool withTexture, bool withLight) {
-    // join folder path with shader file name (platform independent)
-    std::string vertexShaderPath = SHADER_PATH + vertexPath;
-    std::string fragmentShaderPath = SHADER_PATH + fragmentPath;
-
-    return {vertexShaderPath, fragmentShaderPath, withTexture, withLight};
+Shader loadShader(const std::string &vertexFunctionName, const std::string &fragmentFunctionName, bool withTexture, bool withLight) {
+    return {vertexFunctionName, fragmentFunctionName, withTexture, withLight};
 }
-
-
-GLuint compileProgram(GLuint vertexShader, GLuint fragmentShader) {
-    GLuint programID = glCreateProgram();
-
-    glAttachShader(programID, vertexShader);
-    glAttachShader(programID, fragmentShader);
-    glLinkProgram(programID);
-
-    GLchar infoLog[1024];
-    GLint success;
-    glGetProgramiv(programID, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(programID, 1024, nullptr, infoLog);
-        std::cout << "ERROR::PROGRAM_LINKING_ERROR:  " << infoLog << std::endl;
-    }
-    return programID;
-}
-

@@ -4,58 +4,70 @@
 
 #include <string>
 #include <map>
+#include <iostream>
 #include "CubeMap.h"
 #include "stb_image.h"
-#include "glad/glad.h"
+#include "../utils/metal/MetalContext.h"
+#include <Metal/Metal.hpp>
 
-CubeMap::CubeMap(const std::string& pathSuffix, std::map<std::string, GLenum> & faces) {
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
-
+CubeMap::CubeMap(const std::string& pathSuffix, std::map<std::string, int> & faces) {
     stbi_set_flip_vertically_on_load(false);
 
     int width, height, nrChannels;
     unsigned char *data;
+    
+    MTL::TextureDescriptor* texDesc = MTL::TextureDescriptor::alloc()->init();
+    texDesc->setTextureType(MTL::TextureTypeCube);
+    texDesc->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+    
+    MTL::Device* device = MetalContext::get()->getDevice();
+    bool descriptorSetup = false;
+    
+    // face names usually: right, left, top, bottom, front, back
     for (auto &face : faces) {
-
         std::string filename = pathSuffix + face.first;
-
-        data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 0);
-        // print data
+        data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 4);
+        
         if (data) {
-            glTexImage2D(face.second, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            if (!descriptorSetup) {
+                texDesc->setWidth(width);
+                texDesc->setHeight(height);
+                texture = device->newTexture(texDesc);
+                descriptorSetup = true;
+            }
+            
+            MTL::Region region = MTL::Region::Make2D(0, 0, width, height);
+            texture->replaceRegion(region, 0, face.second, data, width * 4, width * height * 4);
+            stbi_image_free(data);
         } else {
-            std::cout << "Cubemap texture failed to load at path: " << pathSuffix << std::endl;
+            std::cout << "Cubemap texture failed to load at path: " << filename << std::endl;
         }
-
-        stbi_image_free(data);
     }
+    
+    texDesc->release();
+}
 
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+CubeMap::~CubeMap() {
+    if (texture) texture->release();
+    if (vertexBuffer) vertexBuffer->release();
 }
 
 void CubeMap::makeObject(Shader& shader) {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * FacesCoords.size(), &FacesCoords[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) nullptr);
-    glBindVertexArray(0);
+    MTL::Device* device = MetalContext::get()->getDevice();
+    vertexBuffer = device->newBuffer(&FacesCoords[0], FacesCoords.size() * sizeof(float), MTL::ResourceStorageModeShared);
 }
 
 void CubeMap::draw(Shader& shader) const {
-    glDepthFunc(GL_LEQUAL);
-    glBindVertexArray(VAO);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
+    MTL::RenderCommandEncoder* encoder = shader.encoder;
+    if (!encoder) return;
+    
+    encoder->setVertexBytes(&shader.uniforms, sizeof(Uniforms), 1);
+    encoder->setFragmentTexture(texture, 0);
+    
+    if (vertexBuffer) {
+        encoder->setVertexBuffer(vertexBuffer, 0, 0);
+        encoder->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(36));
+    }
 }
 
 std::vector<float> CubeMap::FacesCoords = {

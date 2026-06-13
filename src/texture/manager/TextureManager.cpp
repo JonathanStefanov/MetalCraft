@@ -5,18 +5,22 @@
 #include <iostream>
 #include "TextureManager.h"
 #include "../texture/Texture.h"
+#include <Metal/Metal.hpp>
 
-void TextureManager::linkTexture(TextureType type, const char* path) {
-    textures[type] = Texture(path).getID();
-}
+std::map<TextureType, MTL::Texture*> TextureManager::textures;
 
-GLuint TextureManager::getTextureID(TextureType type) {
-    if (textures.find(type) != textures.end()) {
-        return textures[type];
-    } else {
-        std::cout << "Error: texture not found - " << type << std::endl;
-        return -1;
+void TextureManager::linkTexture(TextureType type, const char *path) {
+    Texture t(path);
+    if (t.getTexture()) {
+        textures[type] = t.getTexture();
+        textures[type]->retain();
     }
 }
 
-std::map<TextureType, GLuint> TextureManager::textures = std::map<TextureType, GLuint>();
+MTL::Texture* TextureManager::getTextureID(TextureType type) {
+    if (textures.find(type) != textures.end()) {
+        return textures[type];
+    } else {
+        return nullptr;
+    }
+}

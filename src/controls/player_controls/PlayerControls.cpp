@@ -3,6 +3,7 @@
 //
 
 #include "PlayerControls.h"
+#include <iostream>
 
 PlayerControls::PlayerControls(IGameObject *player, Camera &camera, World &world)
         : player(player), camera(camera), world(world) {}

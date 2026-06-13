@@ -5,37 +5,41 @@
 #include "Texture.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "glad/glad.h"
-
 #include <iostream>
+#include "../../utils/metal/MetalContext.h"
+#include <Metal/Metal.hpp>
 
 Texture::Texture(std::string path) {
+    stbi_set_flip_vertically_on_load(false); // No need to flip vertically for Metal usually, but we will keep OpenGL conventions if needed. Actually Metal origin is top-left, OpenGL is bottom-left. Let's flip it if the original did to keep UVs working.
+    // Wait, original code: stbi_set_flip_vertically_on_load(true);
     stbi_set_flip_vertically_on_load(true);
-    glGenTextures(1, &textureID);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // Define the parameters for the texture
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    // Load the image
 
     int width, height, imNrChannels;
-    unsigned char *data = stbi_load(&path[0], &width, &height, &imNrChannels, 0);
+    unsigned char *data = stbi_load(path.c_str(), &width, &height, &imNrChannels, 4);
+    
     if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        // print youhou
-        std::cout << "Youhou" << std::endl;
+        MTL::TextureDescriptor* texDesc = MTL::TextureDescriptor::alloc()->init();
+        texDesc->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+        texDesc->setWidth(width);
+        texDesc->setHeight(height);
+        
+        MTL::Device* device = MetalContext::get()->getDevice();
+        texture = device->newTexture(texDesc);
+        
+        MTL::Region region = MTL::Region::Make2D(0, 0, width, height);
+        texture->replaceRegion(region, 0, data, width * 4);
+        
+        texDesc->release();
+        stbi_image_free(data);
     } else {
-        std::cout << "Failed to load texture block" << std::endl;
+        std::cout << "Failed to load texture block: " << path << std::endl;
     }
 }
 
-GLuint Texture::getID() const {
-    return textureID;
+Texture::~Texture() {
+    if (texture) texture->release();
+}
+
+MTL::Texture* Texture::getTexture() const {
+    return texture;
 }

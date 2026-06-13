@@ -4,69 +4,46 @@
 
 #include "Renderer.h"
 #include "../../texture/manager/TextureManager.h"
+#include "../../utils/metal/MetalContext.h"
+#include <Metal/Metal.hpp>
 
-void Renderer::draw(Shader &shader, Transform &transform, Mesh *mesh, GLuint textureID) const {
-    // print texture
-    if (shader.withTexture) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glUniform1i(glGetUniformLocation(shader.ID, "tex"), 0);
-    }
-
+void Renderer::draw(Shader &shader, Transform &transform, Mesh *mesh, MTL::Texture* texture) const {
+    MTL::RenderCommandEncoder* encoder = shader.encoder;
+    if (!encoder) return;
+    
     shader.setMatrix4("M", transform.getModel());
 
-    if (textureID == TextureManager::getTextureID(TextureType::WATER)) {
-        shader.setFloat("opacity", .7);
-        shader.setBool("isWater", true);
-    } else {
-        shader.setBool("isWater", false);
-        shader.setFloat("opacity", 1);
+    // Send uniforms
+    encoder->setVertexBytes(&shader.uniforms, sizeof(Uniforms), 1);
+    encoder->setFragmentBytes(&shader.uniforms, sizeof(Uniforms), 1);
+    
+    if (shader.withLight) {
+        encoder->setFragmentBytes(&shader.lightUniforms, sizeof(LightUniforms), 2);
+    }
+    
+    if (shader.withTexture && texture) {
+        encoder->setFragmentTexture(texture, 0);
     }
 
-    glBindVertexArray(this->VAO);
-    glDrawArrays(GL_TRIANGLES, 0, mesh->getVerticesCount());
+    if (vertexBuffer) {
+        encoder->setVertexBuffer(vertexBuffer, 0, 0);
+        encoder->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(mesh->getVerticesCount()));
+    }
 }
 
 void Renderer::makeObject(Shader &shader, Mesh *mesh, Transform &transform) {
-    float *data = mesh->toFloatArray();
-    int dataSize = mesh->getFloatArraySize();
+    if (!vertexBuffer) {
+        float *data = mesh->toFloatArray();
+        int dataSize = mesh->getFloatArraySize();
 
-    if (this->VAO == 0) {
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-
-        //define VBO and VAO as active buffer and active vertex array
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, dataSize, data, GL_STATIC_DRAW);
-    } else {
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        MTL::Device* device = MetalContext::get()->getDevice();
+        vertexBuffer = device->newBuffer(data, dataSize, MTL::ResourceStorageModeShared);
+        
+        delete[] data;
     }
-
-
-    auto att_pos = glGetAttribLocation(shader.ID, "position");
-    glEnableVertexAttribArray(att_pos);
-    glVertexAttribPointer(att_pos, 3, GL_FLOAT, false, 8 * sizeof(float), (void *) nullptr);
-
-    if (shader.withTexture) {
-        auto att_tex = glGetAttribLocation(shader.ID, "tex_coord");
-        glEnableVertexAttribArray(att_tex);
-        glVertexAttribPointer(att_tex, 2, GL_FLOAT, false, 8 * sizeof(float), (void *) (3 * sizeof(float)));
-
-        auto att_col = glGetAttribLocation(shader.ID, "normal");
-        glEnableVertexAttribArray(att_col);
-        glVertexAttribPointer(att_col, 3, GL_FLOAT, false, 8 * sizeof(float), (void *) (5 * sizeof(float)));
-    }
-
-
-    //desactive the buffer
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
 }
 
 void Renderer::makeObject(Shader shader, Mesh *pMesh, Transform transform, Renderer renderer) {
-    VAO = renderer.VAO;
-    VBO = renderer.VBO;
+    vertexBuffer = renderer.vertexBuffer;
     makeObject(shader, pMesh, transform);
 }

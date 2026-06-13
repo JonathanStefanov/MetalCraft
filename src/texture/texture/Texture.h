@@ -5,17 +5,18 @@
 #ifndef OPENGLPROJECT_TEXTURE_H
 #define OPENGLPROJECT_TEXTURE_H
 
-#include "glad/glad.h"
 #include <string>
+
+namespace MTL { class Texture; }
 
 class Texture {
 public:
-    GLuint textureID{};
+    MTL::Texture* texture = nullptr;
 
     explicit Texture(std::string path);
+    ~Texture();
 
-    GLuint getID() const;
+    MTL::Texture* getTexture() const;
 };
-
 
 #endif //OPENGLPROJECT_TEXTURE_H

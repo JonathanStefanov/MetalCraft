@@ -7,7 +7,8 @@
 
 #include <string>
 #include <map>
-#include "glad/glad.h"
+
+namespace MTL { class Texture; }
 
 
 enum TextureType {
@@ -21,11 +22,11 @@ enum TextureType {
 
 
 class TextureManager {
-    static std::map<TextureType, GLuint> textures;
+    static std::map<TextureType, MTL::Texture*> textures;
 public:
     static void linkTexture(TextureType type, const char *path);
 
-    static GLuint getTextureID(TextureType type);
+    static MTL::Texture* getTextureID(TextureType type);
 };
 
 

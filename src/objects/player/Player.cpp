@@ -23,11 +23,11 @@ Player::Player() {
     leftArm->transform.rotateZ(90);
 
 
-    player->setTextureID(TextureManager::getTextureID(PLAYER));
-    leftArm->setTextureID(TextureManager::getTextureID(PLAYER));
-    rightArm->setTextureID(TextureManager::getTextureID(PLAYER));
-    leftLeg->setTextureID(TextureManager::getTextureID(PLAYER));
-    rightLeg->setTextureID(TextureManager::getTextureID(PLAYER));
+    player->setTexture(TextureManager::getTextureID(PLAYER));
+    leftArm->setTexture(TextureManager::getTextureID(PLAYER));
+    rightArm->setTexture(TextureManager::getTextureID(PLAYER));
+    leftLeg->setTexture(TextureManager::getTextureID(PLAYER));
+    rightLeg->setTexture(TextureManager::getTextureID(PLAYER));
 }
 
 void Player::makeObject(Shader &shader) {

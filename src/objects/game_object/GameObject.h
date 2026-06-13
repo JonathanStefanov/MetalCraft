@@ -27,11 +27,11 @@ public:
     Mesh* mesh{};
     Renderer renderer;
     Transform transform;
-    GLuint textureID{};
+    MTL::Texture* texture = nullptr;
     Collider collider{};
     PhysicsData physicsData{};
 
-    void setTextureID(GLuint textureID);
+    void setTexture(MTL::Texture* tex);
 
     void draw(Shader& shader) override;
 

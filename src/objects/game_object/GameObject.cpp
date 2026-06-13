@@ -3,6 +3,7 @@
 //
 
 #include "GameObject.h"
+#include <iostream>
 
 int GameObject::loadMesh(const std::string &path) {
     this->mesh = new Mesh(path);
@@ -18,7 +19,7 @@ int GameObject::loadMesh(const std::string &path) {
 }
 
 void GameObject::draw(Shader& shader) {
-    this->renderer.draw(shader, this->transform, this->mesh, this->textureID);
+    this->renderer.draw(shader, this->transform, this->mesh, this->texture);
 }
 
 void GameObject::makeObject(Shader& shader) {
@@ -32,8 +33,8 @@ GameObject::GameObject(const std::string &pathToMesh)  {
 
 GameObject::GameObject(Mesh *mesh) : mesh(mesh) {}
 
-void GameObject::setTextureID(GLuint newTextureID) {
-    this->textureID = newTextureID;
+void GameObject::setTexture(MTL::Texture* tex) {
+    this->texture = tex;
 }
 
 void GameObject::setCollider(Collider newCollider) {

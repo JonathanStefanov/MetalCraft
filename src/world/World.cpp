@@ -25,7 +25,7 @@ void World::create() {
     for (auto &worldBlock: worldBlocks) {
         // print blockPos
         worldBlockInstances[worldBlock.first] = new GameObject(MeshManager::getMesh(std::get<1>(worldBlock.second)));
-        worldBlockInstances[worldBlock.first]->setTextureID(
+        worldBlockInstances[worldBlock.first]->setTexture(
                 TextureManager::getTextureID(std::get<2>(worldBlock.second)));
         worldBlockInstances[worldBlock.first]->transform.setPosition(std::get<0>(worldBlock.first),
                                                                      std::get<2>(worldBlock.first),
@@ -34,13 +34,13 @@ void World::create() {
 }
 
 void World::makeObjects(Shader &shader) {
-    std::map<GLuint, GameObject *> bases = {};
+    std::map<MTL::Texture*, GameObject *> bases = {};
     for (auto &worldBlockInstance: worldBlockInstances) {
-        if (bases.find(worldBlockInstance.second->textureID) == bases.end()) {
-            bases[worldBlockInstance.second->textureID] = worldBlockInstance.second;
+        if (bases.find(worldBlockInstance.second->texture) == bases.end()) {
+            bases[worldBlockInstance.second->texture] = worldBlockInstance.second;
             worldBlockInstance.second->makeObject(shader);
         } else {
-            worldBlockInstance.second->makeObject(shader, bases[worldBlockInstance.second->textureID]->renderer);
+            worldBlockInstance.second->makeObject(shader, bases[worldBlockInstance.second->texture]->renderer);
         }
     }
 
@@ -99,7 +99,7 @@ bool World::collides(IGameObject *object) {
 
     for (glm::vec3 &vec: collisionBox) {
         GameObject *blockAt = getBlockAt(vec);
-        if (blockAt != nullptr && blockAt->textureID != TextureManager::getTextureID(TextureType::WATER)) {
+        if (blockAt != nullptr && blockAt->texture != TextureManager::getTextureID(TextureType::WATER)) {
             didCollide = true;
             break;
         }
@@ -222,7 +222,7 @@ void World::addBlock(glm::vec3 blockPos, Shader &shader) {
     if(!worldBlockInstances.count(x)){
         // No block at this position, can add the block at blockPos
         worldBlockInstances[x] = new GameObject(MeshManager::getMesh(MeshType::BLOCK));
-        worldBlockInstances[x]->setTextureID(TextureManager::getTextureID(TextureType::DIRT));
+        worldBlockInstances[x]->setTexture(TextureManager::getTextureID(TextureType::DIRT));
         worldBlockInstances[x]->transform.setPosition((int) blockPos.x, (int) blockPos.y, (int) blockPos.z);
 
         // make object and draw
