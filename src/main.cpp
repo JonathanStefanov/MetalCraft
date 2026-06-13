@@ -6,6 +6,7 @@
 #include <QuartzCore/QuartzCore.hpp>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "stb_image.h"
 
 #include <thread>
@@ -21,6 +22,25 @@
 #include "game/Minecraft.h"
 #include "objects/mesh/manager/MeshManager.h"
 #include "cubemap/CubeMap.h"
+#include "game/GameState.h"
+#include "ui/MenuManager.h"
+
+GameState currentState = GameState::MENU;
+MenuManager* g_menuManager = nullptr;
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (currentState == GameState::MENU && g_menuManager) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        g_menuManager->handleMouseClicked(xpos, ypos, button, action);
+    }
+}
+
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (currentState == GameState::MENU && g_menuManager) {
+        g_menuManager->handleMouseMoved(xpos, ypos);
+    }
+}
 
 const int INITIAL_WINDOW_WIDTH = 500;
 const int INITIAL_WINDOW_HEIGHT = 500;
@@ -59,6 +79,7 @@ int main() {
     Shader shadowShader = loadShader("shadowVertex", "shadowFragment", false, false);
     Shader shader = loadShader("vertexMain", "fragmentMain");
     Shader cubeMapShader = loadShader("cubemapVertex", "cubemapFragment");
+    Shader uiShader = loadShader("uiVertex", "uiFragment", true, false);
 
     minecraft->linkShader(shader);
     minecraft->linkShader(shadowShader);
@@ -67,7 +88,13 @@ int main() {
     cubeMap->makeObject(shader);
 
     glfwSwapInterval(1);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
+    
+    MenuManager menuManager;
+    g_menuManager = &menuManager;
+    menuManager.init(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, window);
 
     // Shadow Map Setup
     int shadowTextureWidth = 4096;
@@ -97,12 +124,18 @@ int main() {
         }
         lastTime = currentTime;
         
-        minecraft->processEvents(window, shader);
+        if (currentState == GameState::PLAYING) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+            minecraft->processEvents(window, shader);
 
-        minecraft->updateManagers();
-        glfwPollEvents();
-        minecraft->processEvents(window, shader);
-        minecraft->updateManagers();
+            minecraft->updateManagers();
+            glfwPollEvents();
+            minecraft->processEvents(window, shader);
+            minecraft->updateManagers();
+        } else {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            glfwPollEvents();
+        }
 
         glfwGetFramebufferSize(window, &width, &height);
         MetalContext::get()->getMetalLayer()->setDrawableSize(CGSizeMake(width, height));
@@ -114,9 +147,30 @@ int main() {
 
         MTL::CommandBuffer* cmdBuf = MetalContext::get()->getCommandQueue()->commandBuffer();
 
-        renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
-
-        renderMainPass(drawable, cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+        if (currentState == GameState::PLAYING) {
+            renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
+            renderMainPass(drawable, cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+        } else {
+            MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
+            pass->colorAttachments()->object(0)->setTexture(drawable->texture());
+            pass->colorAttachments()->object(0)->setClearColor(MTL::ClearColor::Make(0.1, 0.1, 0.1, 1.0));
+            pass->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
+            pass->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+            
+            MTL::RenderCommandEncoder* encoder = cmdBuf->renderCommandEncoder(pass);
+            encoder->setRenderPipelineState(uiShader.pipelineState);
+            encoder->setDepthStencilState(uiShader.depthStencilState);
+            uiShader.encoder = encoder;
+            
+            int winW, winH;
+            glfwGetWindowSize(window, &winW, &winH);
+            uiShader.uiProjection = glm::ortho(0.0f, (float)winW, (float)winH, 0.0f, -1.0f, 1.0f);
+            
+            menuManager.draw(uiShader);
+            
+            encoder->endEncoding();
+            pass->release();
+        }
 
         cmdBuf->presentDrawable(drawable);
         cmdBuf->commit();

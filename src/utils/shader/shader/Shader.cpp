@@ -46,8 +46,18 @@ Shader::Shader(const std::string& vertexFunctionName, const std::string& fragmen
     MTL::RenderPipelineDescriptor* pipelineDesc = MTL::RenderPipelineDescriptor::alloc()->init();
     pipelineDesc->setVertexFunction(vertexFunc);
     pipelineDesc->setFragmentFunction(fragmentFunc);
-    pipelineDesc->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
-    pipelineDesc->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+    
+    if (vertexFunctionName == "uiVertex") {
+        pipelineDesc->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+        pipelineDesc->colorAttachments()->object(0)->setBlendingEnabled(true);
+        pipelineDesc->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
+        pipelineDesc->colorAttachments()->object(0)->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+        pipelineDesc->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorSourceAlpha);
+        pipelineDesc->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    } else {
+        pipelineDesc->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+        pipelineDesc->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+    }
     
     MTL::VertexDescriptor* vertexDesc = MTL::VertexDescriptor::alloc()->init();
     if (vertexFunctionName == "cubemapVertex") {
@@ -56,6 +66,17 @@ Shader::Shader(const std::string& vertexFunctionName, const std::string& fragmen
         vertexDesc->attributes()->object(0)->setBufferIndex(0);
         
         vertexDesc->layouts()->object(0)->setStride(3 * sizeof(float));
+        vertexDesc->layouts()->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
+    } else if (vertexFunctionName == "uiVertex") {
+        vertexDesc->attributes()->object(0)->setFormat(MTL::VertexFormatFloat2);
+        vertexDesc->attributes()->object(0)->setOffset(0);
+        vertexDesc->attributes()->object(0)->setBufferIndex(0);
+        
+        vertexDesc->attributes()->object(1)->setFormat(MTL::VertexFormatFloat2);
+        vertexDesc->attributes()->object(1)->setOffset(2 * sizeof(float));
+        vertexDesc->attributes()->object(1)->setBufferIndex(0);
+        
+        vertexDesc->layouts()->object(0)->setStride(4 * sizeof(float));
         vertexDesc->layouts()->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
     } else {
         vertexDesc->attributes()->object(0)->setFormat(MTL::VertexFormatFloat3);
@@ -91,8 +112,13 @@ Shader::Shader(const std::string& vertexFunctionName, const std::string& fragmen
     
     // Depth stencil state
     MTL::DepthStencilDescriptor* depthDesc = MTL::DepthStencilDescriptor::alloc()->init();
-    depthDesc->setDepthCompareFunction(MTL::CompareFunctionLessEqual); // Changed from OpenGL GL_EQUAL depth func in main.cpp to standard
-    depthDesc->setDepthWriteEnabled(true);
+    if (vertexFunctionName == "uiVertex") {
+        depthDesc->setDepthCompareFunction(MTL::CompareFunctionAlways);
+        depthDesc->setDepthWriteEnabled(false);
+    } else {
+        depthDesc->setDepthCompareFunction(MTL::CompareFunctionLessEqual);
+        depthDesc->setDepthWriteEnabled(true);
+    }
     
     depthStencilState = device->newDepthStencilState(depthDesc);
     

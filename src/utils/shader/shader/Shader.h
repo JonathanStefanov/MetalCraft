@@ -2,8 +2,7 @@
 #define SHADER_H
 
 #include <string>
-#include "glm/vec3.hpp"
-#include "glm/fwd.hpp"
+#include <glm/glm.hpp>
 #include "../../metal/ShaderTypes.h"
 
 namespace MTL {
@@ -20,6 +19,7 @@ public:
     MTL::RenderCommandEncoder* encoder = nullptr;
     Uniforms uniforms;
     LightUniforms lightUniforms;
+    glm::mat4 uiProjection;
 
     Shader(const std::string& vertexFunctionName, const std::string& fragmentFunctionName, bool withTexture = true, bool withLight = true);
     ~Shader();
