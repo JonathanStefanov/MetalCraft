@@ -12,6 +12,7 @@
 
 class IGameObject {
 public:
+    virtual ~IGameObject() = default;
     virtual void makeObject(Shader &shader) = 0;
     virtual void draw(Shader &shader) = 0;
     virtual Transform* getTransform()  = 0;

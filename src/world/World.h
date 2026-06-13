@@ -50,7 +50,7 @@ public:
 
     void draw(Shader &shader, glm::vec3 playerPosition);
 
-    void addBlock(glm::vec3 blockPos, Shader &shader);
+    void addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType = TextureType::DIRT);
 };
 
 

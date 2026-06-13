@@ -7,6 +7,7 @@
 
 
 #include "../game_object/GameObject.h"
+#include "../../inventory/Inventory.h"
 
 class Player : public IGameObject {
     GameObject* leftArm;
@@ -18,12 +19,15 @@ public:
     void makeObject(Shader &shader) override;
 
     void draw(Shader &shader) override;
+    void drawHand(Shader &shader);
 
     Transform* getTransform() override;
 
     Player();
 
     GameObject* player;
+    Inventory inventory;
+    bool isFirstPerson = true;
 
     float  lastPosValue = 0.f;
     int rotationDirection = 1;

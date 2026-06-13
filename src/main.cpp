@@ -22,8 +22,10 @@
 #include "game/Minecraft.h"
 #include "objects/mesh/manager/MeshManager.h"
 #include "cubemap/CubeMap.h"
-#include "game/GameState.h"
 #include "ui/MenuManager.h"
+#include "ui/HUDManager.h"
+#include "game/GameState.h"
+#include "objects/player/Player.h"
 
 GameState currentState = GameState::MENU;
 MenuManager* g_menuManager = nullptr;
@@ -97,6 +99,8 @@ int main() {
     g_menuManager = &menuManager;
     menuManager.init(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, window);
 
+    HUDManager hudManager;
+
     // Shadow Map Setup
     int shadowTextureWidth = 4096;
     int shadowTextureHeight = 4096;
@@ -152,6 +156,31 @@ int main() {
         if (currentState == GameState::PLAYING) {
             renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
             renderMainPass(drawable->texture(), cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+
+            // Draw HUD over main pass
+            MTL::RenderPassDescriptor* uiPass = MTL::RenderPassDescriptor::alloc()->init();
+            uiPass->colorAttachments()->object(0)->setTexture(drawable->texture());
+            uiPass->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionLoad);
+            uiPass->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+            
+            MTL::RenderCommandEncoder* uiEncoder = cmdBuf->renderCommandEncoder(uiPass);
+            uiEncoder->setRenderPipelineState(uiShader.pipelineState);
+            uiEncoder->setDepthStencilState(uiShader.depthStencilState);
+            uiShader.encoder = uiEncoder;
+            
+            int winW, winH;
+            glfwGetWindowSize(window, &winW, &winH);
+            uiShader.uiProjection = glm::ortho(0.0f, (float)winW, (float)winH, 0.0f, -1.0f, 1.0f);
+            
+            // Need player's inventory
+            auto* playerObj = dynamic_cast<Player*>(minecraft->player);
+            if (playerObj) {
+                hudManager.draw(uiShader, winW, winH, playerObj->inventory);
+            }
+            
+            uiEncoder->endEncoding();
+            uiPass->release();
+
         } else {
             if (!mainColorTexture || mainColorTexture->width() != width || mainColorTexture->height() != height) {
                 if (mainColorTexture) mainColorTexture->release();

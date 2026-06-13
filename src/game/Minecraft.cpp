@@ -25,6 +25,7 @@ Minecraft::Minecraft(int width, int height, int depth, int nbrTrees, int nbCircl
 
 
     camera = new Camera(block->player->transform);
+    camera->firstPerson = true;
     cameraControls = new CameraControls(*camera, window);
     playerControls = new PlayerControls(block, *camera, *world);
     double size = 0.6;
@@ -90,6 +91,16 @@ void Minecraft::render(Shader &shader) {
 
     for (auto &gameObject : toRender) {
         gameObject->draw(shader);
+    }
+
+    // Draw the hand in first person, overriding the view matrix to fix it to the screen
+    auto* playerObj = dynamic_cast<Player*>(player);
+    if (playerObj && playerObj->isFirstPerson) {
+        // We temporarily clear the view matrix so the hand is drawn relative to camera
+        glm::mat4 oldView = camera->getViewMatrix();
+        shader.setMatrix4("V", glm::mat4(1.0f));
+        playerObj->drawHand(shader);
+        shader.setMatrix4("V", oldView); // Restore
     }
 }
 

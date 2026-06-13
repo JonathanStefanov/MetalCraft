@@ -1,0 +1,30 @@
+#include "HUDManager.h"
+#include "UIUtils.h"
+
+void HUDManager::draw(Shader& shader, int screenWidth, int screenHeight, const Inventory& inventory) {
+    float slotSize = 60.0f;
+    float padding = 5.0f;
+    float totalWidth = (slotSize * 9) + (padding * 8);
+    float startX = (screenWidth - totalWidth) / 2.0f;
+    float startY = screenHeight - slotSize - 20.0f;
+
+    for (int i = 0; i < Inventory::HOTBAR_SIZE; i++) {
+        float x = startX + i * (slotSize + padding);
+        
+        // Draw selection highlight
+        glm::vec4 bgColor = (i == inventory.selectedSlot) ? glm::vec4(0.9f, 0.9f, 0.9f, 0.9f) : glm::vec4(0.4f, 0.4f, 0.4f, 0.8f);
+        UIUtils::drawRect(shader, x, startY, slotSize, slotSize, bgColor);
+        
+        // Draw inner slot background
+        UIUtils::drawRect(shader, x + 4, startY + 4, slotSize - 8, slotSize - 8, glm::vec4(0.1f, 0.1f, 0.1f, 0.8f));
+
+        // Draw item texture
+        Item item = inventory.getHotbarItem(i);
+        if (item.type != ItemType::NONE) {
+            MTL::Texture* tex = TextureManager::getTextureID(item.getTextureType());
+            if (tex) {
+                UIUtils::drawTexture(shader, tex, x + 8, startY + 8, slotSize - 16, slotSize - 16);
+            }
+        }
+    }
+}

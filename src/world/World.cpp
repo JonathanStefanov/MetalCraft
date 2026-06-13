@@ -216,13 +216,13 @@ glm::vec3 World::rayCastingGetLowestBlock(glm::vec3 playerPos, glm::vec3 playerR
     return groundPos;
 }
 
-void World::addBlock(glm::vec3 blockPos, Shader &shader) {
+void World::addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType) {
     // insert into worldBlocks
     const std::tuple<int, int, int> &x = std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y);
     if(!worldBlockInstances.count(x)){
         // No block at this position, can add the block at blockPos
         worldBlockInstances[x] = new GameObject(MeshManager::getMesh(MeshType::BLOCK));
-        worldBlockInstances[x]->setTexture(TextureManager::getTextureID(TextureType::DIRT));
+        worldBlockInstances[x]->setTexture(TextureManager::getTextureID(textureType));
         worldBlockInstances[x]->transform.setPosition((int) blockPos.x, (int) blockPos.y, (int) blockPos.z);
 
         // make object and draw

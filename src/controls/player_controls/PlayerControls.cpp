@@ -3,6 +3,7 @@
 //
 
 #include "PlayerControls.h"
+#include "../../objects/player/Player.h"
 #include <iostream>
 
 PlayerControls::PlayerControls(IGameObject *player, Camera &camera, World &world)
@@ -105,8 +106,26 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
                 std::cout << "endPoint: " << currentPoint.x << " " << currentPoint.y << " " << currentPoint.z << std::endl;
 
                 if (found) {
-                    world.addBlock(currentPoint - direction, shader);
+                    Player* pObj = dynamic_cast<Player*>(player);
+                    if (pObj) {
+                        Item selected = pObj->inventory.getSelectedItem();
+                        if (selected.type != ItemType::NONE) {
+                            world.addBlock(currentPoint - direction, shader, selected.getTextureType());
+                        }
+                    } else {
+                        world.addBlock(currentPoint - direction, shader);
+                    }
                 }
+            }
+        }
+    }
+
+    // Hotbar selection
+    Player* pObj = dynamic_cast<Player*>(player);
+    if (pObj) {
+        for (int i = 0; i < 9; i++) {
+            if (glfwGetKey(window, GLFW_KEY_1 + i) == GLFW_PRESS) {
+                pObj->inventory.selectedSlot = i;
             }
         }
     }
