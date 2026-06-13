@@ -41,7 +41,7 @@ public:
 
     void setPhysicsData(PhysicsData newPhysicsData);
 
-    void makeObject(Shader shader, Renderer& renderer);
+    void makeObject(Shader& shader, Renderer& renderer);
 
     Transform * getTransform()  override;
 };

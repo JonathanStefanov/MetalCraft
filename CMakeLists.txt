@@ -9,6 +9,8 @@ cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
+add_definitions(-DGLM_FORCE_DEPTH_ZERO_TO_ONE)
+
 find_library(METAL_FRAMEWORK Metal)
 find_library(METALKIT_FRAMEWORK MetalKit)
 find_library(COCOA_FRAMEWORK Cocoa)

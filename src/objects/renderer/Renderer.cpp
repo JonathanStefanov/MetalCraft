@@ -43,7 +43,7 @@ void Renderer::makeObject(Shader &shader, Mesh *mesh, Transform &transform) {
     }
 }
 
-void Renderer::makeObject(Shader shader, Mesh *pMesh, Transform transform, Renderer renderer) {
+void Renderer::makeObject(Shader& shader, Mesh *pMesh, Transform& transform, Renderer& renderer) {
     vertexBuffer = renderer.vertexBuffer;
     makeObject(shader, pMesh, transform);
 }

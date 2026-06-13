@@ -23,7 +23,7 @@ public:
 
     void draw(Shader& shader, Transform &transform, Mesh *mesh, MTL::Texture* texture) const;
 
-    void makeObject(Shader shader, Mesh *pMesh, Transform transform, Renderer renderer);
+    void makeObject(Shader& shader, Mesh *pMesh, Transform& transform, Renderer& renderer);
 };
 
 #endif //OPENGLPROJECT_RENDERER_H

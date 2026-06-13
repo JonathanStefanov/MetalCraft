@@ -8,6 +8,7 @@
 
 Shader::Shader(const std::string& vertexFunctionName, const std::string& fragmentFunctionName, bool withTexture, bool withLight) : withTexture(withTexture), withLight(withLight) {
     memset(&uniforms, 0, sizeof(Uniforms));
+    uniforms.opacity = 1.0f;
     memset(&lightUniforms, 0, sizeof(LightUniforms));
     
     MTL::Device* device = MetalContext::get()->getDevice();
@@ -47,6 +48,35 @@ Shader::Shader(const std::string& vertexFunctionName, const std::string& fragmen
     pipelineDesc->setFragmentFunction(fragmentFunc);
     pipelineDesc->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
     pipelineDesc->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+    
+    MTL::VertexDescriptor* vertexDesc = MTL::VertexDescriptor::alloc()->init();
+    if (vertexFunctionName == "cubemapVertex") {
+        vertexDesc->attributes()->object(0)->setFormat(MTL::VertexFormatFloat3);
+        vertexDesc->attributes()->object(0)->setOffset(0);
+        vertexDesc->attributes()->object(0)->setBufferIndex(0);
+        
+        vertexDesc->layouts()->object(0)->setStride(3 * sizeof(float));
+        vertexDesc->layouts()->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
+    } else {
+        vertexDesc->attributes()->object(0)->setFormat(MTL::VertexFormatFloat3);
+        vertexDesc->attributes()->object(0)->setOffset(0);
+        vertexDesc->attributes()->object(0)->setBufferIndex(0);
+        
+        vertexDesc->attributes()->object(1)->setFormat(MTL::VertexFormatFloat2);
+        vertexDesc->attributes()->object(1)->setOffset(3 * sizeof(float));
+        vertexDesc->attributes()->object(1)->setBufferIndex(0);
+        
+        vertexDesc->attributes()->object(2)->setFormat(MTL::VertexFormatFloat3);
+        vertexDesc->attributes()->object(2)->setOffset(5 * sizeof(float));
+        vertexDesc->attributes()->object(2)->setBufferIndex(0);
+        
+        vertexDesc->layouts()->object(0)->setStride(8 * sizeof(float));
+        vertexDesc->layouts()->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
+    }
+    
+    pipelineDesc->setVertexDescriptor(vertexDesc);
+    vertexDesc->release();
+    
     
     // Setup blending for color attachment 0
     MTL::RenderPipelineColorAttachmentDescriptor* colorAttach = pipelineDesc->colorAttachments()->object(0);

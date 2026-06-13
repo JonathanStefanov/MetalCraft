@@ -145,6 +145,7 @@ void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Min
     pass->depthAttachment()->setStoreAction(MTL::StoreActionDontCare);
     
     MTL::RenderCommandEncoder* encoder = cmdBuf->renderCommandEncoder(pass);
+    encoder->setFrontFacingWinding(MTL::WindingCounterClockwise);
     encoder->setCullMode(MTL::CullModeBack);
     
     // Draw Skybox
@@ -178,6 +179,7 @@ void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, MTL::Texture* s
     pass->depthAttachment()->setStoreAction(MTL::StoreActionStore);
     
     MTL::RenderCommandEncoder* encoder = cmdBuf->renderCommandEncoder(pass);
+    encoder->setFrontFacingWinding(MTL::WindingCounterClockwise);
     encoder->setCullMode(MTL::CullModeBack);
     encoder->setRenderPipelineState(shadowShader.pipelineState);
     encoder->setDepthStencilState(shadowShader.depthStencilState);

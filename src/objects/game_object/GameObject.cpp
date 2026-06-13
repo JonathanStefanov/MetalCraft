@@ -45,7 +45,7 @@ void GameObject::setPhysicsData(PhysicsData newPhysicsData) {
     this->physicsData = newPhysicsData;
 }
 
-void GameObject::makeObject(Shader shader, Renderer& aRenderer) {
+void GameObject::makeObject(Shader& shader, Renderer& aRenderer) {
     this->renderer.makeObject(shader, this->mesh, this->transform, aRenderer);
 
 }
