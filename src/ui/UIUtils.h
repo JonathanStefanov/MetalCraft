@@ -11,4 +11,5 @@ class UIUtils {
 public:
     static void drawRect(Shader& shader, float x, float y, float w, float h, const glm::vec4& color);
     static void drawTexture(Shader& shader, MTL::Texture* texture, float x, float y, float w, float h, const glm::vec4& color = glm::vec4(1.0f));
+    static void drawBlurredTexture(Shader& shader, MTL::Texture* texture, float x, float y, float w, float h, float screenW, float screenH);
 };

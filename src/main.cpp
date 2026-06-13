@@ -53,7 +53,7 @@ CubeMap *loadCubeMap();
 
 void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, MTL::Texture* shadowMapTexture, MTL::CommandBuffer* cmdBuf, const glm::mat4 &lightV, const glm::mat4 &lightP);
 
-void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height);
+void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height);
 
 
 int main() {
@@ -80,6 +80,7 @@ int main() {
     Shader shader = loadShader("vertexMain", "fragmentMain");
     Shader cubeMapShader = loadShader("cubemapVertex", "cubemapFragment");
     Shader uiShader = loadShader("uiVertex", "uiFragment", true, false);
+    Shader blurShader = loadShader("uiVertex", "blurFragment", true, false);
 
     minecraft->linkShader(shader);
     minecraft->linkShader(shadowShader);
@@ -112,6 +113,7 @@ int main() {
     glm::mat4 lightSpaceMatrix = lightP * lightV;
 
     int width, height;
+    MTL::Texture* mainColorTexture = nullptr;
     
     double lastTime = glfwGetTime();
     const double targetFrameTime = 1.0 / 60.0;
@@ -149,8 +151,22 @@ int main() {
 
         if (currentState == GameState::PLAYING) {
             renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
-            renderMainPass(drawable, cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+            renderMainPass(drawable->texture(), cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
         } else {
+            if (!mainColorTexture || mainColorTexture->width() != width || mainColorTexture->height() != height) {
+                if (mainColorTexture) mainColorTexture->release();
+                MTL::TextureDescriptor* colorDesc = MTL::TextureDescriptor::alloc()->init();
+                colorDesc->setPixelFormat(MetalContext::get()->getMetalLayer()->pixelFormat());
+                colorDesc->setWidth(width);
+                colorDesc->setHeight(height);
+                colorDesc->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+                mainColorTexture = MetalContext::get()->getDevice()->newTexture(colorDesc);
+                colorDesc->release();
+            }
+
+            renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
+            renderMainPass(mainColorTexture, cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+
             MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
             pass->colorAttachments()->object(0)->setTexture(drawable->texture());
             pass->colorAttachments()->object(0)->setClearColor(MTL::ClearColor::Make(0.1, 0.1, 0.1, 1.0));
@@ -166,7 +182,7 @@ int main() {
             glfwGetWindowSize(window, &winW, &winH);
             uiShader.uiProjection = glm::ortho(0.0f, (float)winW, (float)winH, 0.0f, -1.0f, 1.0f);
             
-            menuManager.draw(uiShader, winW, winH);
+            menuManager.draw(uiShader, winW, winH, mainColorTexture, &blurShader);
             
             encoder->endEncoding();
             pass->release();
@@ -177,6 +193,7 @@ int main() {
     }
 
     if (shadowMapTexture) shadowMapTexture->release();
+    if (mainColorTexture) mainColorTexture->release();
     MetalContext::cleanup();
     glfwDestroyWindow(window);
     glfwTerminate();
@@ -184,9 +201,9 @@ int main() {
     return 0;
 }
 
-void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height) {
+void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height) {
     MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
-    pass->colorAttachments()->object(0)->setTexture(drawable->texture());
+    pass->colorAttachments()->object(0)->setTexture(targetTexture);
     pass->colorAttachments()->object(0)->setClearColor(MTL::ClearColor::Make(0.1, 0.1, 0.1, 1.0));
     pass->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
     pass->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
@@ -216,7 +233,23 @@ void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Min
     encoder->setRenderPipelineState(cubeMapShader.pipelineState);
     encoder->setDepthStencilState(cubeMapShader.depthStencilState);
     cubeMapShader.encoder = encoder;
-    minecraft->configureMatrices(cubeMapShader);
+    
+    extern GameState currentState;
+    static float menuRotation = 0.0f;
+    if (currentState == GameState::MENU) {
+        menuRotation += 0.005f;
+        glm::vec3 cameraPos = glm::vec3(50.0f + 40.0f * cos(menuRotation), 60.0f, 50.0f + 40.0f * sin(menuRotation));
+        glm::vec3 cameraTarget = glm::vec3(50.0f, 20.0f, 50.0f);
+        glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        
+        // Remove translation for skybox
+        glm::mat4 skyView = glm::mat4(glm::mat3(view)); 
+        cubeMapShader.setMatrix4("V", skyView);
+        cubeMapShader.setMatrix4("P", minecraft->camera->getProjectionMatrix());
+    } else {
+        minecraft->configureMatrices(cubeMapShader);
+    }
     cubeMap->draw(cubeMapShader);
     
     // Draw Minecraft
@@ -224,8 +257,20 @@ void renderMainPass(CA::MetalDrawable* drawable, MTL::CommandBuffer* cmdBuf, Min
     encoder->setDepthStencilState(shader.depthStencilState);
     shader.encoder = encoder;
     shader.setMatrix4("lightSpaceMatrix", lightSpaceMatrix);
-    minecraft->configureMatrices(shader);
-    shader.setVector3f("u_view_pos", minecraft->camera->transform.position);
+    
+    if (currentState == GameState::MENU) {
+        glm::vec3 cameraPos = glm::vec3(50.0f + 40.0f * cos(menuRotation), 60.0f, 50.0f + 40.0f * sin(menuRotation));
+        glm::vec3 cameraTarget = glm::vec3(50.0f, 20.0f, 50.0f);
+        glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        
+        shader.setMatrix4("V", view);
+        shader.setMatrix4("P", minecraft->camera->getProjectionMatrix());
+        shader.setVector3f("u_view_pos", cameraPos);
+    } else {
+        minecraft->configureMatrices(shader);
+        shader.setVector3f("u_view_pos", minecraft->camera->transform.position);
+    }
     
     encoder->setFragmentTexture(shadowMapTexture, 1);
     encoder->setFragmentTexture(cubeMap->texture, 2); // Set cubemap for water reflection

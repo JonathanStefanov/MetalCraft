@@ -4,6 +4,8 @@
 #include "UIUtils.h"
 #include "../game/GameState.h"
 #include "../texture/manager/TextureManager.h"
+#include "../utils/shader/shader/Shader.h"
+#include <Metal/Metal.hpp>
 #include <GLFW/glfw3.h>
 
 extern GameState currentState;
@@ -35,11 +37,20 @@ void MenuManager::init(int screenWidth, int screenHeight, GLFWwindow* window) {
     elements.push_back(std::move(quitBtn));
 }
 
-void MenuManager::draw(Shader& shader, int screenWidth, int screenHeight) {
-    // Draw wood background
-    MTL::Texture* bgTex = TextureManager::getTextureID(WOOD);
-    if (bgTex) {
-        UIUtils::drawTexture(shader, bgTex, 0, 0, screenWidth, screenHeight);
+void MenuManager::draw(Shader& shader, int screenWidth, int screenHeight, MTL::Texture* bgTex, Shader* blurShader) {
+    if (bgTex && blurShader) {
+        blurShader->uiProjection = shader.uiProjection;
+        blurShader->encoder = shader.encoder;
+        
+        // Bind the blur pipeline state!
+        shader.encoder->setRenderPipelineState(blurShader->pipelineState);
+        shader.encoder->setDepthStencilState(blurShader->depthStencilState);
+        
+        UIUtils::drawBlurredTexture(*blurShader, bgTex, 0, 0, screenWidth, screenHeight, screenWidth, screenHeight);
+        
+        // Restore the standard UI pipeline state for text and buttons
+        shader.encoder->setRenderPipelineState(shader.pipelineState);
+        shader.encoder->setDepthStencilState(shader.depthStencilState);
     }
     
     // Draw title

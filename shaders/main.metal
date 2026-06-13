@@ -210,9 +210,9 @@ vertex UIVertexOut uiVertex(UIVertexIn in [[stage_in]],
 
 fragment float4 uiFragment(UIVertexOut in [[stage_in]],
                            constant UIUniforms &uniforms [[buffer(1)]],
-                           texture2d<float> tex [[texture(0)]],
-                           sampler texSampler [[sampler(0)]])
+                           texture2d<float> tex [[texture(0)]])
 {
+    constexpr sampler texSampler(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
     if (uniforms.type == 0) {
         return uniforms.color;
     } else if (uniforms.type == 1) {
@@ -222,4 +222,27 @@ fragment float4 uiFragment(UIVertexOut in [[stage_in]],
         float4 tColor = tex.sample(texSampler, in.v_t);
         return tColor * uniforms.color;
     }
+}
+
+struct BlurUniforms {
+    float2 resolution;
+};
+
+fragment float4 blurFragment(UIVertexOut in [[stage_in]],
+                             texture2d<float> tex [[texture(0)]],
+                             constant BlurUniforms &blurUni [[buffer(2)]])
+{
+    constexpr sampler texSampler(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    float2 tex_offset = 1.0 / blurUni.resolution;
+    float4 result = float4(0.0);
+    float totalWeight = 0.0;
+    
+    for(int x = -4; x <= 4; ++x) {
+        for(int y = -4; y <= 4; ++y) {
+            float2 offset = float2(x, y) * tex_offset;
+            result += tex.sample(texSampler, in.v_t + offset);
+            totalWeight += 1.0;
+        }
+    }
+    return result / totalWeight;
 }
