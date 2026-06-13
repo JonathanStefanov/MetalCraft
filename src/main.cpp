@@ -42,7 +42,7 @@ int main() {
     }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // Don't create an OpenGL context
 
-    GLFWwindow *window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "Gaspard is cool", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "MetalCraft", nullptr, nullptr);
 
     if (window == nullptr) {
         glfwTerminate();
@@ -85,8 +85,18 @@ int main() {
     glm::mat4 lightSpaceMatrix = lightP * lightV;
 
     int width, height;
+    
+    double lastTime = glfwGetTime();
+    const double targetFrameTime = 1.0 / 60.0;
 
     while (!glfwWindowShouldClose(window)) {
+        double currentTime = glfwGetTime();
+        if (currentTime - lastTime < targetFrameTime) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+        lastTime = currentTime;
+        
         minecraft->processEvents(window, shader);
 
         minecraft->updateManagers();
