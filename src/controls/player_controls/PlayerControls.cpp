@@ -3,11 +3,28 @@
 //
 
 #include "PlayerControls.h"
+#include "../../objects/dropped_item/DroppedItemManager.h"
 #include "../../objects/player/Player.h"
 #include <iostream>
 
-PlayerControls::PlayerControls(IGameObject *player, Camera &camera, World &world)
-        : player(player), camera(camera), world(world) {}
+PlayerControls::PlayerControls(IGameObject *player, Camera &camera, World &world, DroppedItemManager& droppedItemManager)
+        : player(player), world(world), camera(camera), droppedItemManager(droppedItemManager) {}
+
+float PlayerControls::getMiningDuration(TextureType textureType) const {
+    switch (textureType) {
+        case TextureType::LEAF: return 0.25f;
+        case TextureType::DIRT:
+        case TextureType::GRASS: return 0.55f;
+        case TextureType::GLOW_STONE: return 0.8f;
+        case TextureType::WOOD: return 1.2f;
+        default: return 0.7f;
+    }
+}
+
+void PlayerControls::resetMining() {
+    isMining = false;
+    miningStartTime = 0;
+}
 
 void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
     processMouse(window);
@@ -51,10 +68,32 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
 
                 glm::vec3 hitBlock, previousEmptyBlock;
                 if (world.raycastBlocks(currentPoint, direction, 6.0f, hitBlock, previousEmptyBlock)) {
-                    world.removeBlock(hitBlock);
-                    std::cout << "Block removed at " << hitBlock.x << " " << hitBlock.z << " " << hitBlock.y << std::endl;
+                    TextureType blockTexture;
+                    if (world.getBlockTextureTypeAt(hitBlock, blockTexture)) {
+                        if (!isMining || hitBlock != miningBlock) {
+                            isMining = true;
+                            miningBlock = hitBlock;
+                            miningStartTime = glfwGetTime();
+                        }
+
+                        if (glfwGetTime() - miningStartTime >= getMiningDuration(blockTexture)) {
+                            Item droppedItem = world.removeBlock(hitBlock);
+                            droppedItemManager.spawn(droppedItem, hitBlock + glm::vec3(0.5f, 0.7f, 0.5f), shader);
+                            std::cout << "Block removed at " << hitBlock.x << " " << hitBlock.z << " " << hitBlock.y << std::endl;
+                            resetMining();
+                        }
+                    } else {
+                        resetMining();
+                    }
+                } else {
+                    resetMining();
                 }
+            } else {
+                resetMining();
             }
+        }
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+            resetMining();
         }
         // check if right click
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
@@ -138,4 +177,3 @@ void PlayerControls::processMouse(GLFWwindow *window) {
 
     lastX = windowWidth / 2;
 }
-

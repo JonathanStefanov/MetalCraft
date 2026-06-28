@@ -16,4 +16,5 @@ struct Item {
 
     Item(ItemType type = ItemType::NONE, int quantity = 0) : type(type), quantity(quantity) {}
     TextureType getTextureType() const;
+    static Item fromTextureType(TextureType textureType, int quantity = 1);
 };

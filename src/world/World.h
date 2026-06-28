@@ -13,6 +13,7 @@
 #include "../objects/game_object/GameObject.h"
 #include "../objects/mesh/manager/MeshManager.h"
 #include "../texture/manager/TextureManager.h"
+#include "../inventory/Item.h"
 
 class World {
 public:
@@ -38,7 +39,7 @@ public:
 
     void draw(Shader& shader);
 
-    void removeBlock(glm::vec3 blockPos);
+    Item removeBlock(glm::vec3 blockPos);
 
 
     void makeObjects(Shader &shader);
@@ -46,6 +47,8 @@ public:
     bool collides(IGameObject* object);
 
     GameObject *getBlockAt(glm::vec3 &vec);
+
+    bool getBlockTextureTypeAt(glm::vec3 blockPos, TextureType& outTextureType) const;
 
     void draw(Shader &shader, glm::vec3 playerPosition);
 

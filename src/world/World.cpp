@@ -72,6 +72,16 @@ GameObject *World::getBlockAt(glm::vec3 &vec) {
     return nullptr;
 }
 
+bool World::getBlockTextureTypeAt(glm::vec3 blockPos, TextureType& outTextureType) const {
+    auto blockData = worldBlocks.find(std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y));
+    if (blockData == worldBlocks.end()) {
+        return false;
+    }
+
+    outTextureType = std::get<2>(blockData->second);
+    return true;
+}
+
 bool World::collides(IGameObject *object) {
     glm::vec3 position = object->getTransform()->position + glm::vec3(0.5f, 0, 0.5f);
 
@@ -108,8 +118,23 @@ bool World::collides(IGameObject *object) {
     return didCollide;
 }
 
-void World::removeBlock(glm::vec3 blockPos) {
-    worldBlockInstances.erase(std::make_tuple(blockPos.x, blockPos.z, blockPos.y));
+Item World::removeBlock(glm::vec3 blockPos) {
+    auto key = std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y);
+    auto blockData = worldBlocks.find(key);
+    Item droppedItem;
+
+    if (blockData != worldBlocks.end()) {
+        droppedItem = Item::fromTextureType(std::get<2>(blockData->second), 1);
+        worldBlocks.erase(blockData);
+    }
+
+    auto blockInstance = worldBlockInstances.find(key);
+    if (blockInstance != worldBlockInstances.end()) {
+        delete blockInstance->second;
+        worldBlockInstances.erase(blockInstance);
+    }
+
+    return droppedItem;
 }
 
 float World::normalizeAngle(float angle) {
@@ -148,6 +173,7 @@ void World::addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType
     const std::tuple<int, int, int> &x = std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y);
     if(!worldBlockInstances.count(x)){
         // No block at this position, can add the block at blockPos
+        worldBlocks[x] = std::make_tuple(1, MeshType::BLOCK, textureType);
         worldBlockInstances[x] = new GameObject(MeshManager::getMesh(MeshType::BLOCK));
         worldBlockInstances[x]->setTexture(TextureManager::getTextureID(textureType));
         worldBlockInstances[x]->transform.setPosition((int) blockPos.x, (int) blockPos.y, (int) blockPos.z);

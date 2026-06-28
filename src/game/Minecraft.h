@@ -14,6 +14,8 @@
 #include "../utils/shader/shader/Light.h"
 #include "../pnj/PNJManager.h"
 #include "../physics/PhysicsManager.h"
+#include "../objects/dropped_item/DroppedItemManager.h"
+#include "../world/BlockOutlineRenderer.h"
 
 class Minecraft {
     glm::vec3 playerSpawn{};
@@ -25,6 +27,10 @@ class Minecraft {
     PNJManager *pnjManager;
 
     PhysicsManager *physicsManager;
+
+    DroppedItemManager *droppedItemManager;
+
+    BlockOutlineRenderer *blockOutlineRenderer;
 public:
     Minecraft(int width, int height, int depth, int nbrTrees, int nbCircles, glm::vec3 playerSpawn, GLFWwindow *window);
 
@@ -32,11 +38,15 @@ public:
 
     void render(Shader &shader);
 
+    void renderTargetBlockOutline(Shader &shader);
+
     void processEvents(GLFWwindow *window, Shader &shader);
 
     void configureMatrices(Shader &shader) const;
 
     void updateManagers();
+
+    bool getTargetedBlock(glm::vec3& outBlockPosition) const;
 
     Camera *camera;
     Light *light;

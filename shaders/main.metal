@@ -129,6 +129,22 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]],
     return FragColor;
 }
 
+struct OutlineVertexOut {
+    float4 position [[position]];
+};
+
+vertex OutlineVertexOut outlineVertex(VertexIn in [[stage_in]],
+                                      constant Uniforms &uniforms [[buffer(1)]])
+{
+    OutlineVertexOut out;
+    out.position = uniforms.P * uniforms.V * uniforms.M * float4(in.position, 1.0);
+    return out;
+}
+
+fragment float4 outlineFragment(OutlineVertexOut in [[stage_in]]) {
+    return float4(0.0, 0.0, 0.0, 1.0);
+}
+
 // --- Shadow Shader ---
 struct ShadowVertexOut {
     float4 position [[position]];

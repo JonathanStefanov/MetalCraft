@@ -7,6 +7,7 @@
 #include "../objects/mesh/manager/MeshManager.h"
 #include "../texture/manager/TextureManager.h"
 #include "../objects/player/Player.h"
+#include <glm/gtc/matrix_transform.hpp>
 
 Minecraft::Minecraft(int width, int height, int depth, int nbrTrees, int nbCircles, glm::vec3 playerSpawn, GLFWwindow *window) : world(
         generateFlatWorld(width, height, depth, nbrTrees, nbCircles)) {
@@ -27,7 +28,9 @@ Minecraft::Minecraft(int width, int height, int depth, int nbrTrees, int nbCircl
     camera = new Camera(block->player->transform);
     camera->firstPerson = true;
     cameraControls = new CameraControls(*camera, window);
-    playerControls = new PlayerControls(block, *camera, *world);
+    droppedItemManager = new DroppedItemManager();
+    blockOutlineRenderer = new BlockOutlineRenderer();
+    playerControls = new PlayerControls(block, *camera, *world, *droppedItemManager);
     double size = 0.6;
 
     for (int i = 0; i < 20; i++) {
@@ -93,6 +96,8 @@ void Minecraft::render(Shader &shader) {
         gameObject->draw(shader);
     }
 
+    droppedItemManager->draw(shader);
+
     // Draw the hand in first person, overriding the view matrix to fix it to the screen
     auto* playerObj = dynamic_cast<Player*>(player);
     if (playerObj && playerObj->isFirstPerson) {
@@ -101,6 +106,13 @@ void Minecraft::render(Shader &shader) {
         shader.setMatrix4("V", glm::mat4(1.0f));
         playerObj->drawHand(shader);
         shader.setMatrix4("V", oldView); // Restore
+    }
+}
+
+void Minecraft::renderTargetBlockOutline(Shader &shader) {
+    glm::vec3 targetBlock;
+    if (getTargetedBlock(targetBlock)) {
+        blockOutlineRenderer->draw(shader, targetBlock);
     }
 }
 
@@ -125,4 +137,22 @@ void Minecraft::configureMatrices(Shader &shader) const {
 void Minecraft::updateManagers() {
     pnjManager->update();
     physicsManager->update();
+    auto* playerObj = dynamic_cast<Player*>(player);
+    if (playerObj) {
+        droppedItemManager->update(*playerObj, *world);
+    }
+}
+
+bool Minecraft::getTargetedBlock(glm::vec3& outBlockPosition) const {
+    if (!camera->firstPerson) {
+        return false;
+    }
+
+    glm::mat4 rotationMatrixY = glm::rotate(glm::mat4(1.0), glm::radians(180 + player->getTransform()->rotation.y), glm::vec3(0, 1.0f, 0));
+    glm::mat4 rotationMatrixX = glm::rotate(glm::mat4(1.0), glm::radians(-camera->firstPersonRotation), glm::vec3(1.0f, 0, 0));
+    glm::vec3 direction = glm::normalize(glm::vec3(rotationMatrixY * rotationMatrixX * glm::vec4(0, 0, 1, 1)));
+    glm::vec3 start = player->getTransform()->position + glm::vec3(0, camera->firstPersonDelta.y, 0);
+
+    glm::vec3 previousEmptyBlock;
+    return world->raycastBlocks(start, direction, 6.0f, outBlockPosition, previousEmptyBlock);
 }

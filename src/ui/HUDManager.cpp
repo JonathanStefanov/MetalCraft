@@ -2,6 +2,17 @@
 #include "UIUtils.h"
 
 void HUDManager::draw(Shader& shader, int screenWidth, int screenHeight, const Inventory& inventory) {
+    const float centerX = screenWidth / 2.0f;
+    const float centerY = screenHeight / 2.0f;
+    const float crosshairLength = 18.0f;
+    const float crosshairThickness = 2.0f;
+    const glm::vec4 crosshairColor = glm::vec4(0.95f, 0.95f, 0.95f, 0.9f);
+
+    UIUtils::drawRect(shader, centerX - crosshairThickness / 2.0f, centerY - crosshairLength / 2.0f,
+                      crosshairThickness, crosshairLength, crosshairColor);
+    UIUtils::drawRect(shader, centerX - crosshairLength / 2.0f, centerY - crosshairThickness / 2.0f,
+                      crosshairLength, crosshairThickness, crosshairColor);
+
     float slotSize = 60.0f;
     float padding = 5.0f;
     float totalWidth = (slotSize * 9) + (padding * 8);

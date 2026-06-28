@@ -55,7 +55,7 @@ CubeMap *loadCubeMap();
 
 void renderShadowMap(Minecraft *minecraft, Shader &shadowShader, MTL::Texture* shadowMapTexture, MTL::CommandBuffer* cmdBuf, const glm::mat4 &lightV, const glm::mat4 &lightP);
 
-void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height);
+void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, Shader &outlineShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height);
 
 
 int main() {
@@ -81,6 +81,7 @@ int main() {
     Shader shadowShader = loadShader("shadowVertex", "shadowFragment", false, false);
     Shader shader = loadShader("vertexMain", "fragmentMain");
     Shader cubeMapShader = loadShader("cubemapVertex", "cubemapFragment");
+    Shader outlineShader = loadShader("outlineVertex", "outlineFragment", false, false);
     Shader uiShader = loadShader("uiVertex", "uiFragment", true, false);
     Shader blurShader = loadShader("uiVertex", "blurFragment", true, false);
 
@@ -157,7 +158,7 @@ int main() {
 
         if (currentState == GameState::PLAYING) {
             renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
-            renderMainPass(drawable->texture(), cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+            renderMainPass(drawable->texture(), cmdBuf, minecraft, shader, cubeMapShader, outlineShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
 
             // Draw HUD over main pass
             MTL::RenderPassDescriptor* uiPass = MTL::RenderPassDescriptor::alloc()->init();
@@ -196,7 +197,7 @@ int main() {
             }
 
             renderShadowMap(minecraft, shadowShader, shadowMapTexture, cmdBuf, lightV, lightP);
-            renderMainPass(mainColorTexture, cmdBuf, minecraft, shader, cubeMapShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
+            renderMainPass(mainColorTexture, cmdBuf, minecraft, shader, cubeMapShader, outlineShader, cubeMap, shadowMapTexture, lightSpaceMatrix, width, height);
 
             MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
             pass->colorAttachments()->object(0)->setTexture(drawable->texture());
@@ -232,7 +233,7 @@ int main() {
     return 0;
 }
 
-void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height) {
+void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Minecraft *minecraft, Shader &shader, Shader &cubeMapShader, Shader &outlineShader, const CubeMap *cubeMap, MTL::Texture* shadowMapTexture, const glm::mat4 &lightSpaceMatrix, int width, int height) {
     MTL::RenderPassDescriptor* pass = MTL::RenderPassDescriptor::alloc()->init();
     pass->colorAttachments()->object(0)->setTexture(targetTexture);
     pass->colorAttachments()->object(0)->setClearColor(MTL::ClearColor::Make(0.1, 0.1, 0.1, 1.0));
@@ -306,6 +307,14 @@ void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Min
     encoder->setFragmentTexture(shadowMapTexture, 1);
     encoder->setFragmentTexture(cubeMap->texture, 2); // Set cubemap for water reflection
     minecraft->render(shader);
+
+    if (currentState == GameState::PLAYING) {
+        encoder->setRenderPipelineState(outlineShader.pipelineState);
+        encoder->setDepthStencilState(outlineShader.depthStencilState);
+        outlineShader.encoder = encoder;
+        minecraft->configureMatrices(outlineShader);
+        minecraft->renderTargetBlockOutline(outlineShader);
+    }
     
     encoder->endEncoding();
     pass->release();
