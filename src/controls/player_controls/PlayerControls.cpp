@@ -27,24 +27,74 @@ void PlayerControls::resetMining() {
     miningDuration = 0;
 }
 
+void PlayerControls::moveWithCollision(glm::vec3 oldPosition, glm::vec3 desiredPosition) {
+    Transform* transform = player->getTransform();
+
+    auto isGrounded = [this]() {
+        return player->physicsData.velocity == 0 && player->physicsData.acceleration == 0;
+    };
+
+    bool didStepUp = false;
+    auto tryStepUp = [&]() {
+        if (!isGrounded() || didStepUp) {
+            return false;
+        }
+
+        glm::vec3 collisionPosition = transform->position;
+        glm::vec3 steppedPosition = transform->position + glm::vec3(0.0f, 1.0f, 0.0f);
+        transform->setPosition(steppedPosition.x, steppedPosition.y, steppedPosition.z);
+        if (!world.collides(player)) {
+            player->physicsData.velocity = 0;
+            player->physicsData.acceleration = 0;
+            didStepUp = true;
+            return true;
+        }
+
+        transform->setPosition(collisionPosition.x, collisionPosition.y, collisionPosition.z);
+        return false;
+    };
+
+    transform->setPosition(desiredPosition.x, oldPosition.y, oldPosition.z);
+    if (world.collides(player) && !tryStepUp()) {
+        transform->setPosition(oldPosition.x, transform->position.y, oldPosition.z);
+    }
+
+    transform->setPosition(transform->position.x, transform->position.y, desiredPosition.z);
+    if (world.collides(player) && !tryStepUp()) {
+        transform->setPosition(transform->position.x, transform->position.y, oldPosition.z);
+    }
+}
+
 void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
     processMouse(window);
 
     glm::vec3 oldPosition = player->getTransform()->position;
+    glm::vec3 desiredPosition = oldPosition;
 
     if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) != GLFW_PRESS) {
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            player->getTransform()->setPosition(desiredPosition.x, desiredPosition.y, desiredPosition.z);
             player->getTransform()->translate(-speed, 0, 0);
+            desiredPosition = player->getTransform()->position;
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            player->getTransform()->setPosition(desiredPosition.x, desiredPosition.y, desiredPosition.z);
             player->getTransform()->translate(speed, 0, 0);
+            desiredPosition = player->getTransform()->position;
         }
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            player->getTransform()->setPosition(desiredPosition.x, desiredPosition.y, desiredPosition.z);
             player->getTransform()->translate(0, 0, -speed);
+            desiredPosition = player->getTransform()->position;
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            player->getTransform()->setPosition(desiredPosition.x, desiredPosition.y, desiredPosition.z);
             player->getTransform()->translate(0, 0, speed);
+            desiredPosition = player->getTransform()->position;
         }
+        player->getTransform()->setPosition(oldPosition.x, oldPosition.y, oldPosition.z);
+        moveWithCollision(oldPosition, desiredPosition);
+
         // space to jump
         if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
             if (player->physicsData.velocity == 0 && player->physicsData.acceleration == 0) {
@@ -79,7 +129,7 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
                         miningDuration = getMiningDuration(blockTexture);
 
                         if (glfwGetTime() - miningStartTime >= miningDuration) {
-                            Item droppedItem = world.removeBlock(hitBlock);
+                            Item droppedItem = world.removeBlock(hitBlock, &shader);
                             droppedItemManager.spawn(droppedItem, hitBlock + glm::vec3(0.5f, 0.7f, 0.5f), shader);
                             std::cout << "Block removed at " << hitBlock.x << " " << hitBlock.z << " " << hitBlock.y << std::endl;
                             resetMining();
@@ -153,10 +203,6 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
         }
     }
 
-
-    if (world.collides(player)) {
-        player->getTransform()->position = oldPosition;
-    }
 }
 
 

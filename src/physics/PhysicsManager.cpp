@@ -7,29 +7,21 @@
 void PhysicsManager::update() {
     for (auto &data: objects) {
         PhysicsData &physicsData = data->physicsData;
+        float previousY = data->getTransform()->position.y;
 
         physicsData.velocity += physicsData.acceleration;
         physicsData.velocity -= physicsData.velocity * physicsData.dragCoefficient;
 
-        data->getTransform()->translate(0, physicsData.velocity, 0);
+        data->getTransform()->translatePure(0, physicsData.velocity, 0);
 
-        GameObject *blockAt = world->getBlockAt(data->getTransform()->position);
-
-
-
-
-        if (physicsData.velocity != 0 && blockAt != nullptr &&
-            blockAt->texture != TextureManager::getTextureID(TextureType::WATER)) {
-
-
-            data->getTransform()->setPosition(data->getTransform()->position.x, blockAt->transform.position.y + 1,
-                                            data->getTransform()->position.z);
-
+        float currentY = data->getTransform()->position.y;
+        float standingTopY = 0.0f;
+        if (physicsData.velocity <= 0 && world->findStandingBlockTop(data, previousY, currentY, standingTopY)) {
+            data->getTransform()->setPosition(data->getTransform()->position.x, standingTopY,
+                                             data->getTransform()->position.z);
             physicsData.velocity = 0;
             physicsData.acceleration = 0;
-        } else if (blockAt == nullptr || blockAt->texture == TextureManager::getTextureID(TextureType::WATER)) {
-                physicsData.acceleration = -0.02;
-        } else if (physicsData.velocity != 0){
+        } else {
             physicsData.acceleration = -0.02;
         }
     }

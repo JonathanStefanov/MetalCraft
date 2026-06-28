@@ -140,7 +140,7 @@ int main() {
             } else {
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
                 minecraft->processEvents(window, shader);
-                minecraft->updateManagers();
+                minecraft->updateManagers(shader);
             }
         } else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);

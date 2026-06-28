@@ -44,7 +44,7 @@ public:
 
     void configureMatrices(Shader &shader) const;
 
-    void updateManagers();
+    void updateManagers(Shader &shader);
 
     bool getTargetedBlock(glm::vec3& outBlockPosition) const;
 

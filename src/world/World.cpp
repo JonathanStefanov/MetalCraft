@@ -7,30 +7,247 @@
 #include "../objects/mesh/manager/MeshManager.h"
 #include "glm/gtc/quaternion.hpp"
 
+#include <cmath>
 #include <utility>
+#include <vector>
 
-const int FIELD_OF_VIEW = 100;
+const int FIELD_OF_VIEW = 140;
 
 World::World(std::map<std::tuple<int, int, int>, std::tuple<int, MeshType, TextureType>> map, int length, int width,
-             int depth) {
+             int depth) : generator(1337) {
     worldBlocks = std::move(map);
     this->depth = depth;
     this->width = width;
     this->length = length;
 }
 
-void World::create() {
+World::World(int seed) : generator(seed) {}
 
-
-    for (auto &worldBlock: worldBlocks) {
-        // print blockPos
-        worldBlockInstances[worldBlock.first] = new GameObject(MeshManager::getMesh(std::get<1>(worldBlock.second)));
-        worldBlockInstances[worldBlock.first]->setTexture(
-                TextureManager::getTextureID(std::get<2>(worldBlock.second)));
-        worldBlockInstances[worldBlock.first]->transform.setPosition(std::get<0>(worldBlock.first),
-                                                                     std::get<2>(worldBlock.first),
-                                                                     std::get<1>(worldBlock.first));
+World::~World() {
+    for (auto& worldBlockInstance : worldBlockInstances) {
+        delete worldBlockInstance.second;
     }
+}
+
+int World::floorDiv(int value, int divisor) {
+    int quotient = value / divisor;
+    int remainder = value % divisor;
+    if (remainder != 0 && ((remainder < 0) != (divisor < 0))) {
+        --quotient;
+    }
+    return quotient;
+}
+
+void World::create() {
+    std::vector<BlockKey> keys;
+    for (const auto& worldBlock : worldBlocks) {
+        keys.push_back(worldBlock.first);
+    }
+
+    for (const BlockKey& key : keys) {
+        refreshBlockRenderState(key, nullptr);
+    }
+}
+
+ChunkCoord World::getChunkCoordForBlock(int x, int z) const {
+    return {floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE)};
+}
+
+bool World::isChunkLoaded(ChunkCoord coord) const {
+    return loadedChunks.find(coord) != loadedChunks.end();
+}
+
+bool World::isKeyInsideChunk(const BlockKey& key, ChunkCoord coord) const {
+    int x = std::get<0>(key);
+    int z = std::get<1>(key);
+    int minX = coord.x * CHUNK_SIZE;
+    int minZ = coord.z * CHUNK_SIZE;
+
+    return x >= minX && x < minX + CHUNK_SIZE &&
+           z >= minZ && z < minZ + CHUNK_SIZE;
+}
+
+void World::addBlockObject(const BlockKey& key, const BlockData& data, Shader* shader) {
+    if (worldBlockInstances.find(key) != worldBlockInstances.end()) {
+        return;
+    }
+
+    auto* block = new GameObject(MeshManager::getMesh(data.meshType));
+    block->setTexture(TextureManager::getTextureID(data.textureType));
+    block->transform.setPosition(std::get<0>(key), std::get<2>(key), std::get<1>(key));
+
+    if (shader != nullptr) {
+        block->makeObject(*shader);
+    }
+
+    worldBlockInstances[key] = block;
+}
+
+void World::removeBlockObject(const BlockKey& key) {
+    auto blockInstance = worldBlockInstances.find(key);
+    if (blockInstance != worldBlockInstances.end()) {
+        delete blockInstance->second;
+        worldBlockInstances.erase(blockInstance);
+    }
+}
+
+bool World::hasBlockAt(const BlockKey& key) const {
+    return worldBlocks.find(key) != worldBlocks.end();
+}
+
+bool World::isWaterBlockAt(const BlockKey& key) const {
+    auto blockData = worldBlocks.find(key);
+    if (blockData == worldBlocks.end()) {
+        return false;
+    }
+
+    return std::get<2>(blockData->second) == TextureType::WATER;
+}
+
+bool World::shouldRenderBlock(const BlockKey& key) const {
+    auto blockData = worldBlocks.find(key);
+    if (blockData == worldBlocks.end()) {
+        return false;
+    }
+
+    TextureType textureType = std::get<2>(blockData->second);
+    if (textureType == TextureType::WATER) {
+        return true;
+    }
+
+    int x = std::get<0>(key);
+    int z = std::get<1>(key);
+    int y = std::get<2>(key);
+    std::vector<BlockKey> neighbors = {
+            std::make_tuple(x + 1, z, y),
+            std::make_tuple(x - 1, z, y),
+            std::make_tuple(x, z + 1, y),
+            std::make_tuple(x, z - 1, y),
+            std::make_tuple(x, z, y + 1),
+            std::make_tuple(x, z, y - 1),
+    };
+
+    for (const BlockKey& neighbor : neighbors) {
+        if (!hasBlockAt(neighbor) || isWaterBlockAt(neighbor)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void World::refreshBlockRenderState(const BlockKey& key, Shader* shader) {
+    auto blockData = worldBlocks.find(key);
+    if (blockData == worldBlocks.end()) {
+        removeBlockObject(key);
+        return;
+    }
+
+    if (!shouldRenderBlock(key)) {
+        removeBlockObject(key);
+        return;
+    }
+
+    addBlockObject(key, {std::get<1>(blockData->second), std::get<2>(blockData->second)}, shader);
+}
+
+void World::refreshBlockAndNeighbors(const BlockKey& key, Shader* shader) {
+    int x = std::get<0>(key);
+    int z = std::get<1>(key);
+    int y = std::get<2>(key);
+    std::vector<BlockKey> blocksToRefresh = {
+            key,
+            std::make_tuple(x + 1, z, y),
+            std::make_tuple(x - 1, z, y),
+            std::make_tuple(x, z + 1, y),
+            std::make_tuple(x, z - 1, y),
+            std::make_tuple(x, z, y + 1),
+            std::make_tuple(x, z, y - 1),
+    };
+
+    for (const BlockKey& blockToRefresh : blocksToRefresh) {
+        refreshBlockRenderState(blockToRefresh, shader);
+    }
+}
+
+void World::loadChunk(ChunkCoord coord, Shader* shader) {
+    if (isChunkLoaded(coord)) {
+        return;
+    }
+
+    Chunk chunk = generator.generateChunk(coord);
+
+    for (const BlockKey& removedBlock : removedBlockOverrides) {
+        if (isKeyInsideChunk(removedBlock, coord)) {
+            chunk.removeBlock(removedBlock);
+        }
+    }
+
+    for (const auto& placedBlock : placedBlockOverrides) {
+        if (isKeyInsideChunk(placedBlock.first, coord)) {
+            chunk.setBlock(placedBlock.first, placedBlock.second);
+        }
+    }
+
+    auto insertedChunk = loadedChunks.insert(std::make_pair(coord, chunk));
+
+    for (const auto& block : insertedChunk.first->second.blocks) {
+        worldBlocks[block.first] = std::make_tuple(1, block.second.meshType, block.second.textureType);
+    }
+
+    for (const auto& block : insertedChunk.first->second.blocks) {
+        refreshBlockAndNeighbors(block.first, shader);
+    }
+}
+
+void World::unloadChunk(ChunkCoord coord, Shader* shader) {
+    auto chunkIterator = loadedChunks.find(coord);
+    if (chunkIterator == loadedChunks.end()) {
+        return;
+    }
+
+    std::vector<BlockKey> unloadedKeys;
+    for (const auto& block : chunkIterator->second.blocks) {
+        unloadedKeys.push_back(block.first);
+        removeBlockObject(block.first);
+        worldBlocks.erase(block.first);
+    }
+
+    loadedChunks.erase(chunkIterator);
+
+    for (const BlockKey& key : unloadedKeys) {
+        refreshBlockAndNeighbors(key, shader);
+    }
+}
+
+void World::updateLoadedChunks(glm::vec3 playerPosition, Shader& shader) {
+    int playerX = (int) std::floor(playerPosition.x);
+    int playerZ = (int) std::floor(playerPosition.z);
+    ChunkCoord center = getChunkCoordForBlock(playerX, playerZ);
+
+    std::set<ChunkCoord> chunksToKeep;
+    for (int dz = -LOAD_RADIUS; dz <= LOAD_RADIUS; ++dz) {
+        for (int dx = -LOAD_RADIUS; dx <= LOAD_RADIUS; ++dx) {
+            ChunkCoord coord{center.x + dx, center.z + dz};
+            chunksToKeep.insert(coord);
+            loadChunk(coord, &shader);
+        }
+    }
+
+    std::vector<ChunkCoord> chunksToUnload;
+    for (const auto& loadedChunk : loadedChunks) {
+        if (chunksToKeep.find(loadedChunk.first) == chunksToKeep.end()) {
+            chunksToUnload.push_back(loadedChunk.first);
+        }
+    }
+
+    for (const ChunkCoord& coord : chunksToUnload) {
+        unloadChunk(coord, &shader);
+    }
+}
+
+int World::getTerrainHeightAt(int x, int z) const {
+    return generator.getTerrainHeightAt(x, z);
 }
 
 void World::makeObjects(Shader &shader) {
@@ -108,8 +325,9 @@ bool World::collides(IGameObject *object) {
     bool didCollide = false;
 
     for (glm::vec3 &vec: collisionBox) {
-        GameObject *blockAt = getBlockAt(vec);
-        if (blockAt != nullptr && blockAt->texture != TextureManager::getTextureID(TextureType::WATER)) {
+        int blockY = vec.y < 0 ? (int) vec.y - 1 : (int) vec.y;
+        BlockKey key = std::make_tuple((int) vec.x, (int) vec.z, blockY);
+        if (hasBlockAt(key) && !isWaterBlockAt(key)) {
             didCollide = true;
             break;
         }
@@ -118,7 +336,57 @@ bool World::collides(IGameObject *object) {
     return didCollide;
 }
 
-Item World::removeBlock(glm::vec3 blockPos) {
+bool World::isSolidBlockAt(int x, int y, int z) const {
+    BlockKey key = std::make_tuple(x, z, y);
+    if (!hasBlockAt(key)) {
+        return false;
+    }
+
+    return !isWaterBlockAt(key);
+}
+
+bool World::findStandingBlockTop(IGameObject* object, float previousY, float currentY, float& outTopY) const {
+    glm::vec3 position = object->getTransform()->position;
+    float halfLength = object->collider.length / 2.0f;
+    float halfWidth = object->collider.width / 2.0f;
+
+    std::vector<glm::vec2> samples = {
+            {position.x, position.z},
+            {position.x - halfLength, position.z - halfWidth},
+            {position.x + halfLength, position.z - halfWidth},
+            {position.x - halfLength, position.z + halfWidth},
+            {position.x + halfLength, position.z + halfWidth},
+    };
+
+    bool foundTop = false;
+    float bestTop = currentY;
+
+    int minY = (int) std::floor(currentY) - 1;
+    int maxY = (int) std::floor(previousY);
+
+    for (const glm::vec2& sample : samples) {
+        int blockX = (int) std::round(sample.x);
+        int blockZ = (int) std::round(sample.y);
+
+        for (int blockY = maxY; blockY >= minY; --blockY) {
+            float blockTop = (float) blockY + 1.0f;
+            if (previousY >= blockTop && currentY <= blockTop && isSolidBlockAt(blockX, blockY, blockZ)) {
+                if (!foundTop || blockTop > bestTop) {
+                    bestTop = blockTop;
+                    foundTop = true;
+                }
+            }
+        }
+    }
+
+    if (foundTop) {
+        outTopY = bestTop;
+    }
+
+    return foundTop;
+}
+
+Item World::removeBlock(glm::vec3 blockPos, Shader* shader) {
     auto key = std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y);
     auto blockData = worldBlocks.find(key);
     Item droppedItem;
@@ -128,11 +396,22 @@ Item World::removeBlock(glm::vec3 blockPos) {
         worldBlocks.erase(blockData);
     }
 
+    placedBlockOverrides.erase(key);
+    removedBlockOverrides.insert(key);
+
+    ChunkCoord chunkCoord = getChunkCoordForBlock(std::get<0>(key), std::get<1>(key));
+    auto chunk = loadedChunks.find(chunkCoord);
+    if (chunk != loadedChunks.end()) {
+        chunk->second.removeBlock(key);
+    }
+
     auto blockInstance = worldBlockInstances.find(key);
     if (blockInstance != worldBlockInstances.end()) {
         delete blockInstance->second;
         worldBlockInstances.erase(blockInstance);
     }
+
+    refreshBlockAndNeighbors(key, shader);
 
     return droppedItem;
 }
@@ -154,7 +433,7 @@ bool World::raycastBlocks(glm::vec3 startPos, glm::vec3 direction, float maxDist
         
         // Check if there's a block at this coordinate
         std::tuple<int, int, int> key = std::make_tuple((int)currentIntPos.x, (int)currentIntPos.z, (int)currentIntPos.y);
-        if (worldBlockInstances.find(key) != worldBlockInstances.end()) {
+        if (worldBlocks.find(key) != worldBlocks.end()) {
             outHitBlock = currentIntPos;
             outPreviousEmptyBlock = previousIntPos;
             return true;
@@ -171,15 +450,20 @@ bool World::raycastBlocks(glm::vec3 startPos, glm::vec3 direction, float maxDist
 bool World::addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType) {
     // insert into worldBlocks
     const std::tuple<int, int, int> &x = std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y);
-    if(!worldBlockInstances.count(x)){
+    if(!worldBlocks.count(x)){
         // No block at this position, can add the block at blockPos
-        worldBlocks[x] = std::make_tuple(1, MeshType::BLOCK, textureType);
-        worldBlockInstances[x] = new GameObject(MeshManager::getMesh(MeshType::BLOCK));
-        worldBlockInstances[x]->setTexture(TextureManager::getTextureID(textureType));
-        worldBlockInstances[x]->transform.setPosition((int) blockPos.x, (int) blockPos.y, (int) blockPos.z);
+        BlockData blockData{MeshType::BLOCK, textureType};
+        removedBlockOverrides.erase(x);
+        placedBlockOverrides[x] = blockData;
+        worldBlocks[x] = std::make_tuple(1, blockData.meshType, blockData.textureType);
 
-        // make object and draw
-        worldBlockInstances[x]->makeObject(shader);
+        ChunkCoord chunkCoord = getChunkCoordForBlock(std::get<0>(x), std::get<1>(x));
+        auto chunk = loadedChunks.find(chunkCoord);
+        if (chunk != loadedChunks.end()) {
+            chunk->second.setBlock(x, blockData);
+        }
+
+        refreshBlockAndNeighbors(x, &shader);
 
         return true;
     }

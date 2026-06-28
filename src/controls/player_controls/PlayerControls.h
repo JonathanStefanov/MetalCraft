@@ -32,6 +32,7 @@ class PlayerControls {
 
     float getMiningDuration(TextureType textureType) const;
     void resetMining();
+    void moveWithCollision(glm::vec3 oldPosition, glm::vec3 desiredPosition);
 public:
     PlayerControls(IGameObject* transform, Camera &camera, World& world, DroppedItemManager& droppedItemManager);
 

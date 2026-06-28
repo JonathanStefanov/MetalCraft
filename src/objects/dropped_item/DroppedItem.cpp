@@ -31,7 +31,8 @@ void DroppedItem::update(World& world, Player& player) {
     }
 
     glm::vec3 below = transform.position + glm::vec3(0.0f, -0.3f, 0.0f);
-    if (world.getBlockAt(below) == nullptr) {
+    int blockY = below.y < 0 ? (int) below.y - 1 : (int) below.y;
+    if (!world.isSolidBlockAt((int) below.x, blockY, (int) below.z)) {
         verticalVelocity -= 0.01f;
         if (verticalVelocity < -0.12f) {
             verticalVelocity = -0.12f;

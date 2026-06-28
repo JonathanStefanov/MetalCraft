@@ -3,20 +3,19 @@
 //
 
 #include "Minecraft.h"
-#include "../utils/world/generate_world.h"
 #include "../objects/mesh/manager/MeshManager.h"
 #include "../texture/manager/TextureManager.h"
 #include "../objects/player/Player.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 Minecraft::Minecraft(int width, int height, int depth, int nbrTrees, int nbCircles, glm::vec3 playerSpawn, GLFWwindow *window) : world(
-        generateFlatWorld(width, height, depth, nbrTrees, nbCircles)) {
-    world->create();
+        new World(1337)) {
     pnjManager = new PNJManager(world);
     physicsManager = new PhysicsManager(world);
 
     auto block = new Player();
     player = block;
+    playerSpawn.y = (float) world->getTerrainHeightAt((int) playerSpawn.x, (int) playerSpawn.z) + 1.0f;
     block->player->transform.position = playerSpawn;
     block->player->transform.markAsDirtyState();
     block->collider = Collider{0.5f, 0.5f, 1.0f};
@@ -120,6 +119,7 @@ void Minecraft::renderTargetBlockOutline(Shader &shader) {
 }
 
 void Minecraft::linkShader(Shader &shader) {
+    world->updateLoadedChunks(player->getTransform()->getPosition(), shader);
     world->makeObjects(shader);
     player->makeObject(shader);
     for (auto &gameObject : toRender) {
@@ -137,7 +137,8 @@ void Minecraft::configureMatrices(Shader &shader) const {
     shader.setMatrix4("P", camera->getProjectionMatrix());
 }
 
-void Minecraft::updateManagers() {
+void Minecraft::updateManagers(Shader &shader) {
+    world->updateLoadedChunks(player->getTransform()->getPosition(), shader);
     pnjManager->update();
     physicsManager->update();
     auto* playerObj = dynamic_cast<Player*>(player);
