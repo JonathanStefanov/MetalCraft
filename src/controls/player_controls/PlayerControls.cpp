@@ -24,6 +24,7 @@ float PlayerControls::getMiningDuration(TextureType textureType) const {
 void PlayerControls::resetMining() {
     isMining = false;
     miningStartTime = 0;
+    miningDuration = 0;
 }
 
 void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
@@ -75,8 +76,9 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
                             miningBlock = hitBlock;
                             miningStartTime = glfwGetTime();
                         }
+                        miningDuration = getMiningDuration(blockTexture);
 
-                        if (glfwGetTime() - miningStartTime >= getMiningDuration(blockTexture)) {
+                        if (glfwGetTime() - miningStartTime >= miningDuration) {
                             Item droppedItem = world.removeBlock(hitBlock);
                             droppedItemManager.spawn(droppedItem, hitBlock + glm::vec3(0.5f, 0.7f, 0.5f), shader);
                             std::cout << "Block removed at " << hitBlock.x << " " << hitBlock.z << " " << hitBlock.y << std::endl;
@@ -120,7 +122,9 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
                     if (pObj) {
                         Item selected = pObj->inventory.getSelectedItem();
                         if (selected.type != ItemType::NONE) {
-                            world.addBlock(previousEmptyBlock, shader, selected.getTextureType());
+                            if (world.addBlock(previousEmptyBlock, shader, selected.getTextureType())) {
+                                pObj->inventory.consumeSelected();
+                            }
                         }
                     } else {
                         world.addBlock(previousEmptyBlock, shader);
@@ -176,4 +180,23 @@ void PlayerControls::processMouse(GLFWwindow *window) {
 
 
     lastX = windowWidth / 2;
+}
+
+bool PlayerControls::hasMiningProgress() const {
+    return isMining && miningDuration > 0;
+}
+
+glm::vec3 PlayerControls::getMiningBlock() const {
+    return miningBlock;
+}
+
+float PlayerControls::getMiningProgress() const {
+    if (!hasMiningProgress()) {
+        return 0.0f;
+    }
+
+    float progress = (float) ((glfwGetTime() - miningStartTime) / miningDuration);
+    if (progress < 0.0f) return 0.0f;
+    if (progress > 1.0f) return 1.0f;
+    return progress;
 }

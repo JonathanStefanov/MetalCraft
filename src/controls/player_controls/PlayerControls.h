@@ -28,6 +28,7 @@ class PlayerControls {
     bool isMining = false;
     glm::vec3 miningBlock = glm::vec3(0);
     double miningStartTime = 0;
+    float miningDuration = 0;
 
     float getMiningDuration(TextureType textureType) const;
     void resetMining();
@@ -37,6 +38,12 @@ public:
     void processEvents(GLFWwindow* window, Shader &shader);
 
     void processMouse(GLFWwindow *window);
+
+    bool hasMiningProgress() const;
+
+    glm::vec3 getMiningBlock() const;
+
+    float getMiningProgress() const;
 
     bool didClick = false;
 };

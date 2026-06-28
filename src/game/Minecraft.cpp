@@ -113,6 +113,9 @@ void Minecraft::renderTargetBlockOutline(Shader &shader) {
     glm::vec3 targetBlock;
     if (getTargetedBlock(targetBlock)) {
         blockOutlineRenderer->draw(shader, targetBlock);
+        if (playerControls->hasMiningProgress() && playerControls->getMiningBlock() == targetBlock) {
+            blockOutlineRenderer->drawCracks(shader, targetBlock, playerControls->getMiningProgress());
+        }
     }
 }
 

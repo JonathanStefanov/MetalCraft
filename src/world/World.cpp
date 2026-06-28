@@ -168,7 +168,7 @@ bool World::raycastBlocks(glm::vec3 startPos, glm::vec3 direction, float maxDist
     return false;
 }
 
-void World::addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType) {
+bool World::addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType) {
     // insert into worldBlocks
     const std::tuple<int, int, int> &x = std::make_tuple((int) blockPos.x, (int) blockPos.z, (int) blockPos.y);
     if(!worldBlockInstances.count(x)){
@@ -181,7 +181,8 @@ void World::addBlock(glm::vec3 blockPos, Shader &shader, TextureType textureType
         // make object and draw
         worldBlockInstances[x]->makeObject(shader);
 
-
+        return true;
     }
 
+    return false;
 }

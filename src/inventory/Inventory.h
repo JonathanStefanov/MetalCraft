@@ -5,10 +5,13 @@
 class Inventory {
 public:
     static const int HOTBAR_SIZE = 9;
+    static constexpr int MAX_STACK_SIZE = 64;
     
     Inventory();
     
-    void add(const Item& item);
+    bool add(const Item& item);
+    bool remove(ItemType type, int quantity);
+    bool consumeSelected(int quantity = 1);
     Item getHotbarItem(int index) const;
     void setHotbarItem(int index, const Item& item);
     

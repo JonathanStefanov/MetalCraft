@@ -1,5 +1,15 @@
 #include "HUDManager.h"
+#include "Font.h"
 #include "UIUtils.h"
+#include <string>
+
+HUDManager::HUDManager() {
+    font = new Font("resources/fonts/Minecraft.ttf", 24.0f);
+}
+
+HUDManager::~HUDManager() {
+    delete font;
+}
 
 void HUDManager::draw(Shader& shader, int screenWidth, int screenHeight, const Inventory& inventory) {
     const float centerX = screenWidth / 2.0f;
@@ -35,6 +45,13 @@ void HUDManager::draw(Shader& shader, int screenWidth, int screenHeight, const I
             MTL::Texture* tex = TextureManager::getTextureID(item.getTextureType());
             if (tex) {
                 UIUtils::drawTexture(shader, tex, x + 8, startY + 8, slotSize - 16, slotSize - 16);
+            }
+
+            if (item.quantity > 1 && font) {
+                std::string quantityText = std::to_string(item.quantity);
+                float textWidth = font->getTextWidth(quantityText);
+                font->drawText(shader, quantityText, x + slotSize - textWidth - 6.0f, startY + slotSize - 8.0f,
+                               glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
             }
         }
     }

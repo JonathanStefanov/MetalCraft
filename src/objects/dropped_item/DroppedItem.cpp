@@ -15,8 +15,20 @@ DroppedItem::DroppedItem(const Item& item, glm::vec3 position)
     setTexture(TextureManager::getTextureID(item.getTextureType()));
 }
 
-void DroppedItem::update(World& world) {
+void DroppedItem::update(World& world, Player& player) {
     transform.rotateY(2.0);
+
+    glm::vec3 playerPosition = player.getTransform()->position + glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 toPlayer = playerPosition - transform.position;
+    float distanceToPlayer = glm::length(toPlayer);
+
+    if (distanceToPlayer < attractionRadius && distanceToPlayer > 0.001f) {
+        float speed = attractionSpeed * (1.0f - distanceToPlayer / attractionRadius) + 0.08f;
+        transform.translatePure(toPlayer.x / distanceToPlayer * speed,
+                                toPlayer.y / distanceToPlayer * speed,
+                                toPlayer.z / distanceToPlayer * speed);
+        return;
+    }
 
     glm::vec3 below = transform.position + glm::vec3(0.0f, -0.3f, 0.0f);
     if (world.getBlockAt(below) == nullptr) {

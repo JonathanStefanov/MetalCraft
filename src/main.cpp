@@ -311,9 +311,11 @@ void renderMainPass(MTL::Texture* targetTexture, MTL::CommandBuffer* cmdBuf, Min
     if (currentState == GameState::PLAYING) {
         encoder->setRenderPipelineState(outlineShader.pipelineState);
         encoder->setDepthStencilState(outlineShader.depthStencilState);
+        encoder->setCullMode(MTL::CullModeNone);
         outlineShader.encoder = encoder;
         minecraft->configureMatrices(outlineShader);
         minecraft->renderTargetBlockOutline(outlineShader);
+        encoder->setCullMode(MTL::CullModeBack);
     }
     
     encoder->endEncoding();

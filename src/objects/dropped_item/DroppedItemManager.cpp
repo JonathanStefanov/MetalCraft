@@ -15,11 +15,14 @@ void DroppedItemManager::spawn(const Item& item, glm::vec3 position, Shader& sha
 void DroppedItemManager::update(Player& player, World& world) {
     for (auto itemIt = droppedItems.begin(); itemIt != droppedItems.end();) {
         DroppedItem& droppedItem = **itemIt;
-        droppedItem.update(world);
+        droppedItem.update(world, player);
 
         if (droppedItem.canPickup(player)) {
-            player.inventory.add(droppedItem.getItem());
-            itemIt = droppedItems.erase(itemIt);
+            if (player.inventory.add(droppedItem.getItem())) {
+                itemIt = droppedItems.erase(itemIt);
+            } else {
+                ++itemIt;
+            }
         } else {
             ++itemIt;
         }
