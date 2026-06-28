@@ -31,7 +31,7 @@ GameState currentState = GameState::MENU;
 MenuManager* g_menuManager = nullptr;
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (currentState == GameState::MENU && g_menuManager) {
+    if (currentState != GameState::PLAYING && g_menuManager) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
         g_menuManager->handleMouseClicked(xpos, ypos, button, action);
@@ -39,7 +39,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (currentState == GameState::MENU && g_menuManager) {
+    if (currentState != GameState::PLAYING && g_menuManager) {
         g_menuManager->handleMouseMoved(xpos, ypos);
     }
 }
@@ -130,17 +130,19 @@ int main() {
         }
         lastTime = currentTime;
         
-        if (currentState == GameState::PLAYING) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-            minecraft->processEvents(window, shader);
+        glfwPollEvents();
 
-            minecraft->updateManagers();
-            glfwPollEvents();
-            minecraft->processEvents(window, shader);
-            minecraft->updateManagers();
+        if (currentState == GameState::PLAYING) {
+            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+                currentState = GameState::PAUSED;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+                minecraft->processEvents(window, shader);
+                minecraft->updateManagers();
+            }
         } else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            glfwPollEvents();
         }
 
         glfwGetFramebufferSize(window, &width, &height);

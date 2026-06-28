@@ -31,11 +31,10 @@ public:
 
     float normalizeAngle(float angle);
 
-    glm::vec3 rayCastingBlockPos(glm::vec3 playerPos, glm::vec3 playerRot);
-
-    glm::vec3 rayCastingGetLowestBlock(glm::vec3 playerPos, glm::vec3 playerRot);
-
-    glm::vec3 rayCastingGetHighestBlock(glm::vec3 playerPos, glm::vec3 playerRot);
+    // Returns true if a block is hit within maxDistance.
+    // outHitBlock: The integer coordinates of the solid block that was hit.
+    // outPreviousEmptyBlock: The integer coordinates of the empty space right before the hit (useful for placing blocks).
+    bool raycastBlocks(glm::vec3 startPos, glm::vec3 direction, float maxDistance, glm::vec3& outHitBlock, glm::vec3& outPreviousEmptyBlock);
 
     void draw(Shader& shader);
 

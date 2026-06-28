@@ -15,16 +15,16 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
     glm::vec3 oldPosition = player->getTransform()->position;
 
     if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) != GLFW_PRESS) {
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
             player->getTransform()->translate(-speed, 0, 0);
         }
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
             player->getTransform()->translate(speed, 0, 0);
         }
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
             player->getTransform()->translate(0, 0, -speed);
         }
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
             player->getTransform()->translate(0, 0, speed);
         }
         // space to jump
@@ -40,27 +40,21 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
 
         // check if left click
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+            if (camera.firstPerson) {
+                glm::mat4 rotationMatrixY  = glm::rotate(glm::mat4(1.0), glm::radians(180 + player->getTransform()->rotation.y), glm::vec3(0, 1.0f, 0));
+                glm::mat4 rotationMatrixX  = glm::rotate(glm::mat4(1.0), glm::radians(-camera.firstPersonRotation), glm::vec3(1.0f, 0, 0));
 
-            // Removing block
-            float yRotation = world.normalizeAngle(player->getTransform()->rotation.y);
-            // normalize y rotation for it to be between 0 and 360 degrees
-            //  one block in front           glm::vec3 blockPos = player->getTransform()->position + glm::vec3(1, -1, 0);
-            // get block in front of player
-            glm::vec3 blockPos = world.rayCastingGetLowestBlock(player->getTransform()->position, player->getTransform()->rotation);
-            // round blockPos
-            //blockPos = player->getTransform()->position + glm::vec3(1, -1, 0);
-            blockPos.x = round(blockPos.x);
-            blockPos.y = round(blockPos.y);
-            blockPos.z = round(blockPos.z);
-            // remove block
-            world.removeBlock(blockPos);
-            //print blockPos
-            std::cout << "Block removed at " << blockPos.x << " " << blockPos.z << " " << blockPos.y << std::endl;
-            // print player position and then rotation
-            std::cout << "Player position: " << player->getTransform()->position.x << " " << player->getTransform()->position.z
-                      << " " << player->getTransform()->position.y << std::endl;
-            std::cout << "Player rotation: " << world.normalizeAngle(player->getTransform()->rotation.y) << std::endl;
+                glm::vec3 direction4 = glm::vec3( rotationMatrixY * rotationMatrixX * glm::vec4(0, 0, 1, 1));
+                glm::vec3 direction = glm::normalize(direction4);
+                
+                glm::vec3 currentPoint = player->getTransform()->position + glm::vec3(0, camera.firstPersonDelta.y, 0);
 
+                glm::vec3 hitBlock, previousEmptyBlock;
+                if (world.raycastBlocks(currentPoint, direction, 6.0f, hitBlock, previousEmptyBlock)) {
+                    world.removeBlock(hitBlock);
+                    std::cout << "Block removed at " << hitBlock.x << " " << hitBlock.z << " " << hitBlock.y << std::endl;
+                }
+            }
         }
         // check if right click
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
@@ -70,50 +64,27 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE && didClick) {
             didClick = false;
-            std::cout << "Player position: " << player->getTransform()->position.x << " " << player->getTransform()->position.y
-                      << " " << player->getTransform()->position.z << std::endl;
             if (camera.firstPerson) {
 
-                std::cout << "Player rotation: " << world.normalizeAngle(player->getTransform()->rotation.y) << std::endl;
                 glm::mat4 rotationMatrixY  = glm::rotate(glm::mat4(1.0), glm::radians(180 +player->getTransform()->rotation.y), glm::vec3(0, 1.0f, 0));
                 glm::mat4 rotationMatrixX  = glm::rotate(glm::mat4(1.0), glm::radians(-camera.firstPersonRotation), glm::vec3(1.0f, 0, 0));
 
 
                 glm::vec3 direction4 = glm::vec3( rotationMatrixY*rotationMatrixX * glm::vec4(0, 0, 1, 1));
-                direction4 = glm::normalize(direction4);
-                const int STEP_PER_UNIT = 10;
-                direction4 =  (1.f / (float) STEP_PER_UNIT) * direction4;
-
-                glm::vec3  direction = glm::vec3(direction4.x, direction4.y, direction4.z);
+                glm::vec3 direction = glm::normalize(direction4);
 
                 glm::vec3 currentPoint = player->getTransform()->position + glm::vec3(0, camera.firstPersonDelta.y, 0);
 
-                bool  found = false;
-
-                std::cout << "Direction: " << direction.x << " " << direction.y << " " << direction.z << std::endl;
-                std::cout << "startPoint: " << currentPoint.x << " " << currentPoint.y << " " << currentPoint.z << std::endl;
-
-
-                for (int i = 0; i < 10*STEP_PER_UNIT; i++) {
-                    currentPoint = currentPoint + direction;
-                    if (world.getBlockAt(currentPoint) != nullptr) {
-                        found = true;
-                        std::cout << "Block found at " << currentPoint.x << " " << currentPoint.y << " " << currentPoint.z << std::endl;
-                        break;
-                    }
-                }
-
-                std::cout << "endPoint: " << currentPoint.x << " " << currentPoint.y << " " << currentPoint.z << std::endl;
-
-                if (found) {
+                glm::vec3 hitBlock, previousEmptyBlock;
+                if (world.raycastBlocks(currentPoint, direction, 6.0f, hitBlock, previousEmptyBlock)) {
                     Player* pObj = dynamic_cast<Player*>(player);
                     if (pObj) {
                         Item selected = pObj->inventory.getSelectedItem();
                         if (selected.type != ItemType::NONE) {
-                            world.addBlock(currentPoint - direction, shader, selected.getTextureType());
+                            world.addBlock(previousEmptyBlock, shader, selected.getTextureType());
                         }
                     } else {
-                        world.addBlock(currentPoint - direction, shader);
+                        world.addBlock(previousEmptyBlock, shader);
                     }
                 }
             }
@@ -132,9 +103,9 @@ void PlayerControls::processEvents(GLFWwindow *window, Shader &shader) {
 
     // rotate if pressing left alt
     if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
             player->getTransform()->rotateY(2);
-        } else if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        } else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
             player->getTransform()->rotateY(-2);
         }
     }
@@ -167,5 +138,4 @@ void PlayerControls::processMouse(GLFWwindow *window) {
 
     lastX = windowWidth / 2;
 }
-
 
